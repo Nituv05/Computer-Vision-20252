@@ -1,10 +1,4 @@
-# M²-CL: Reproduction Project
-
-**Paper:** "Multi-Scale and Multi-Layer Contrastive Learning for Domain Generalization"  
-Aristotelis Ballas & Christos Diou — IEEE Transactions on Artificial Intelligence, 2024  
-arXiv: [2308.14418](https://arxiv.org/abs/2308.14418)
-
----
+# Domain Generalization for Image Classification
 
 ## Quick Start
 
