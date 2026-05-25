@@ -88,7 +88,7 @@ data_root/
 ## Project Structure
 
 ```
-m2cl-reproduction/
+root/
 ├── models/
 │   ├── extraction_block.py   # Extraction block with concentration pipelines
 │   └── m2cl.py               # Full M²-CL model (ResNet-18 + 13 extraction blocks)
@@ -112,7 +112,7 @@ m2cl-reproduction/
 
 | Parameter | Default | Notes |
 |-----------|---------|-------|
-| α (loss weight) | 0.01 | α=1.0 causes ~20% drop |
+| α (loss weight) | 0.01 | α = 1.0 causes ~20% drop |
 | τ (temperature) | 1.0  | Stable in range 0.1–2.0 |
 | r (reduction)   | 4    | Channel compression ratio |
 | dropout p       | 0.5  | Spatial (channel) dropout |
