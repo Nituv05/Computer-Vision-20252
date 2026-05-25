@@ -1,0 +1,21 @@
+dataset: office_home
+num_classes: 65
+domains: [Art, Clipart, Product, RealWorld]
+backbone: resnet18
+epochs: 30
+batch_size: 128
+lr: 0.001
+alpha: 0.01
+temperature: 1.0
+reduction_ratio: 4
+dropout_p: 0.5
+embed_dim: 128
+num_workers: 4
+
+# Paper results (Table II, ResNet-18)
+paper_results:
+  Art: 58.21
+  Clipart: 54.02
+  Product: 71.03
+  RealWorld: 69.82
+  average: 63.27

@@ -1,0 +1,18 @@
+dataset: nico
+num_classes: 19
+backbone: resnet18
+epochs: 30
+batch_size: 128
+lr: 0.001
+alpha: 0.01
+temperature: 1.0
+reduction_ratio: 4
+dropout_p: 0.5
+embed_dim: 128
+num_workers: 4
+
+# Paper results (Table III, N = held-out contexts)
+paper_results:
+  N3: 68.43
+  N5: 65.87
+  N7: 62.19
