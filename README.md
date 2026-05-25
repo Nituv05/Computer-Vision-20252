@@ -100,10 +100,6 @@ root/
 │   └── transforms.py
 ├── configs/
 │   ├── pacs.yaml / vlcs.yaml / office_home.yaml / nico.yaml
-├── slides/
-│   └── generate_slides.py    # Generates m2cl_presentation.pptx
-├── paper/
-│   └── generate_report.py    # Generates m2cl_report.pdf
 ├── train.py
 └── evaluate.py
 ```
