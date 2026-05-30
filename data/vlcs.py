@@ -2,25 +2,53 @@
 VLCS dataset loader.
 Download: https://github.com/belaalb/G2DM (follow VLCS instructions)
 Expected structure:
-  <root>/vlcs/
-    PASCAL/<class>/*.jpg
-    LabelMe/<class>/*.jpg
-    Caltech101/<class>/*.jpg
-    SUN09/<class>/*.jpg
+  <root>/vlcs/ or <root>/VLCS/
+    CALTECH/full/<class_id>/*.jpg
+    LABELME/full/<class_id>/*.jpg
+    PASCAL/full/<class_id>/*.jpg
+    SUN/full/<class_id>/*.jpg
 """
-import os
 from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from utils.transforms import get_train_transform, get_test_transform
 
-DOMAINS = ["PASCAL", "LabelMe", "Caltech101", "SUN09"]
-CLASSES = ["bird", "car", "chair", "dog", "person"]
+DOMAINS = ["CALTECH", "LABELME", "PASCAL", "SUN"]
+DOMAIN_ALIASES = {
+    "caltech": "CALTECH",
+    "caltech101": "CALTECH",
+    "labelme": "LABELME",
+    "pascal": "PASCAL",
+    "voc2007": "PASCAL",
+    "sun": "SUN",
+    "sun09": "SUN",
+}
+CLASSES = ["0", "1", "2", "3", "4"]
+
+
+def canonical_domain(domain: str) -> str:
+    return DOMAIN_ALIASES.get(domain.replace("_", "").lower(), domain)
+
+
+def resolve_dataset_root(root: str) -> Path:
+    base = Path(root)
+    for name in ("vlcs", "VLCS"):
+        candidate = base / name
+        if candidate.exists():
+            return candidate
+    return base / "vlcs"
+
+
+def resolve_domain_root(root: str, domain: str) -> Path:
+    dataset_root = resolve_dataset_root(root)
+    domain_root = dataset_root / canonical_domain(domain)
+    full_root = domain_root / "full"
+    return full_root if full_root.exists() else domain_root
 
 
 class VLCSDataset(Dataset):
     def __init__(self, root: str, domain: str, split: str = "train"):
-        self.root = Path(root) / "vlcs" / domain
+        self.root = resolve_domain_root(root, domain)
         self.transform = get_train_transform() if split == "train" else get_test_transform()
         self.samples = []
         for cls_idx, cls_name in enumerate(CLASSES):

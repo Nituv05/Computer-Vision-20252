@@ -14,11 +14,23 @@ from torch.utils.data import Dataset, DataLoader, ConcatDataset
 from utils.transforms import get_train_transform, get_test_transform
 
 DOMAINS = ["Art", "Clipart", "Product", "RealWorld"]
+DOMAIN_ALIASES = {
+    "RealWorld": ["RealWorld", "Real_World", "Real World", "Real-World"],
+}
+
+
+def resolve_domain_root(root: str, domain: str) -> Path:
+    base = Path(root) / "office_home"
+    for candidate in DOMAIN_ALIASES.get(domain, [domain]):
+        path = base / candidate
+        if path.exists():
+            return path
+    return base / domain
 
 
 class OfficeHomeDataset(Dataset):
     def __init__(self, root: str, domain: str, split: str = "train"):
-        domain_root = Path(root) / "office_home" / domain
+        domain_root = resolve_domain_root(root, domain)
         self.transform = get_train_transform() if split == "train" else get_test_transform()
         self.samples = []
         self.classes = sorted([d.name for d in domain_root.iterdir() if d.is_dir()])

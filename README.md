@@ -1,59 +1,51 @@
-# Domain Generalization for Image Classification
+# M2-CL Reproduction for Domain Generalization
 
-## Quick Start
+Course-project implementation of **Multiscale and Multilayer Contrastive
+Learning for Domain Generalization**.
+
+This repo supports the paper's compared baselines and the proposed methods:
+
+- `erm`: vanilla ResNet classifier baseline.
+- `rsc`: representation self-challenging.
+- `mixup`: domain mixup.
+- `coral`: covariance alignment.
+- `mmd`: maximum mean discrepancy.
+- `sagnet`: style agnostic network.
+- `selfreg`: self-supervised contrastive regularization baseline.
+- `arm`: adaptive risk minimization.
+- `eqrm`: empirical quantile risk minimization.
+- `sagm`: sharpness-aware gradient matching baseline.
+- `m2`: multi-scale/multi-layer extraction blocks concatenated into the classifier.
+- `m2cl`: M2 plus the paper's layer-wise supervised contrastive regularizer.
+
+The implementation is focused on the code required for a final-project
+reproduction: training, leave-one-domain/context evaluation, ablations,
+saliency maps and result summaries.
+
+The default protocol is prepared for running numbers:
+
+- source domains are split independently with a DomainBed-style
+  `holdout_fraction=0.2`;
+- checkpoint selection uses source validation accuracy, not target-test
+  accuracy;
+- optimizer defaults to SGD, `lr=0.001`, `batch_size=128`, `epochs=30`;
+- scheduler defaults to `none`.
+
+## Setup
 
 ```bash
 pip install -r requirements.txt
-
-# Generate the presentation slides
-python slides/generate_slides.py
-# → m2cl_presentation.pptx
-
-# Generate the reproduction report PDF
-python paper/generate_report.py
-# → m2cl_report.pdf
-
-# Smoke-test the model (no dataset required)
-python models/m2cl.py
-python losses/contrastive.py
 ```
 
----
+If ImageNet weights are not cached and the machine has no internet access, add
+`--no_pretrained` to training commands. The paper uses ImageNet-pretrained
+ResNet backbones.
 
-## Training
+## Dataset Layout
 
-```bash
-# PACS — test on Photo domain
-python train.py --dataset pacs --test_domain photo --data_root /path/to/datasets
+Datasets are not included. Put them under one `data_root`:
 
-# VLCS — test on Caltech101 domain
-python train.py --dataset vlcs --test_domain Caltech101 --data_root /path/to/datasets
-
-# Office-Home — test on Art domain
-python train.py --dataset office_home --test_domain Art --data_root /path/to/datasets
-```
-
-## Evaluation (leave-one-domain-out)
-
-```bash
-python evaluate.py --dataset pacs --data_root /path/to/datasets
-python evaluate.py --dataset vlcs --data_root /path/to/datasets
-python evaluate.py --dataset office_home --data_root /path/to/datasets
-```
-
----
-
-## Dataset Preparation
-
-| Dataset     | Download |
-|-------------|----------|
-| PACS        | http://www.eecs.qmul.ac.uk/~dl307/project_iccv2017 |
-| VLCS        | https://github.com/belaalb/G2DM |
-| Office-Home | https://hemanthdv.github.io/officehome-dataset/ |
-| NICO        | https://nicochallenge.com/ |
-
-Expected root structure:
-```
+```text
 data_root/
   pacs/
     art_painting/<class>/*.jpg
@@ -61,55 +53,206 @@ data_root/
     photo/<class>/*.jpg
     sketch/<class>/*.jpg
   vlcs/
-    PASCAL/<class>/*.jpg
-    LabelMe/<class>/*.jpg
-    Caltech101/<class>/*.jpg
-    SUN09/<class>/*.jpg
+    CALTECH/full/<class_id>/*.jpg
+    LABELME/full/<class_id>/*.jpg
+    PASCAL/full/<class_id>/*.jpg
+    SUN/full/<class_id>/*.jpg
   office_home/
     Art/<class>/*.jpg
-    ...
+    Clipart/<class>/*.jpg
+    Product/<class>/*.jpg
+    RealWorld/<class>/*.jpg
   nico/
     <class>/<context>/*.jpg
 ```
 
----
+`office_home/RealWorld` also accepts common aliases such as `Real_World`,
+`Real World` and `Real-World`.
 
-## Paper Results (ResNet-18)
+## Download Datasets
 
-| Dataset     | M²-CL Avg | 2nd Best (SAGM) | Δ      |
-|-------------|-----------|-----------------|--------|
-| PACS        | 83.54%    | 82.68%          | +0.86% |
-| VLCS        | 77.78%    | 75.17%          | +2.61% |
-| Office-Home | 63.27%    | 59.66%          | +3.61% |
-| NICO (N=7)  | 62.19%    | 59.10%          | +3.09% |
+PACS, VLCS and Office-Home can be downloaded with the project downloader.
+It tries the DomainBed Google Drive links first, then falls back to public
+mirrors when Drive blocks scripted access:
 
----
+```bash
+python download_data.py --data_root /path/to/data_root --datasets pacs vlcs office_home
+```
+
+NICO is distributed by the official project site through Dropbox/Baidu. Download
+the archive manually from https://nico.thumedialab.com/, then normalize it:
+
+```bash
+python download_data.py --data_root /path/to/data_root --datasets nico --nico_archive /path/to/NICO.zip
+```
+
+Validate the folder layout before starting long jobs:
+
+```bash
+python check_data.py --data_root /path/to/data_root --dataset pacs
+python check_data.py --data_root /path/to/data_root --dataset vlcs
+python check_data.py --data_root /path/to/data_root --dataset office_home
+```
+
+Use `--dataset all` only after NICO is also present.
+
+## Train
+
+PACS leave-one-domain-out:
+
+```bash
+python train.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl --backbone resnet18
+```
+
+VLCS and Office-Home:
+
+```bash
+python train.py --dataset vlcs --test_domain CALTECH --data_root /path/to/data_root --method m2cl
+python train.py --dataset office_home --test_domain Art --data_root /path/to/data_root --method m2cl
+```
+
+NICO leave-multiple-contexts-out:
+
+```bash
+python train.py --dataset nico --n_heldout 7 --data_root /path/to/data_root --method m2cl
+```
+
+Useful variants and baselines:
+
+```bash
+python train.py --dataset pacs --test_domain photo --method erm
+python train.py --dataset pacs --test_domain photo --method rsc
+python train.py --dataset pacs --test_domain photo --method mixup
+python train.py --dataset pacs --test_domain photo --method coral
+python train.py --dataset pacs --test_domain photo --method mmd
+python train.py --dataset pacs --test_domain photo --method sagnet
+python train.py --dataset pacs --test_domain photo --method selfreg
+python train.py --dataset pacs --test_domain photo --method arm
+python train.py --dataset pacs --test_domain photo --method eqrm
+python train.py --dataset pacs --test_domain photo --method sagm
+python train.py --dataset pacs --test_domain photo --method m2 --alpha 0
+python train.py --dataset pacs --test_domain photo --method m2cl --backbone resnet50
+```
+
+Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
+
+Run a full grid over all domains and seeds:
+
+```bash
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm m2 m2cl --seeds 0 1 2
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods paper_baselines --seeds 0 1 2
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --seeds 0 1 2
+python run_experiments.py --dataset nico --data_root /path/to/data_root --methods erm m2 m2cl --nico_values 3 5 7 --seeds 0 1 2
+```
+
+Use `--dry_run` first to print the exact commands without training. Use
+`--skip_existing` when resuming an interrupted grid.
+
+## Evaluate
+
+Evaluate all held-out domains for a dataset:
+
+```bash
+python evaluate.py --dataset pacs --data_root /path/to/data_root --method m2cl
+python evaluate.py --dataset vlcs --data_root /path/to/data_root --method m2cl
+python evaluate.py --dataset office_home --data_root /path/to/data_root --method m2cl
+```
+
+Evaluate NICO N=3,5,7:
+
+```bash
+python evaluate.py --dataset nico --data_root /path/to/data_root --method m2cl
+```
+
+Summarize metric JSON files across seeds/runs:
+
+```bash
+python summarize_results.py --metrics_dir outputs/checkpoints --output_csv outputs/results.csv
+```
+
+## Ablations
+
+Architecture/model baselines from the paper's ablation setup:
+
+```bash
+python architecture_baselines.py --dataset pacs --data_root /path/to/data_root --seeds 0 1 2
+python architecture_baselines.py --dataset vlcs --data_root /path/to/data_root --seeds 0 1 2
+```
+
+The concrete model classes are implemented in
+`models/architecture_baselines.py`. The root-level `architecture_baselines.py`
+file is only the experiment runner that calls `train.py` for each variant.
+
+This runs the plain ResNet ERM baseline, M2 cascading/parallel variants with
+different reduction ratios and dropout settings, and the full M2-CL model. Each
+variant is saved with a `--tag`, so summaries do not mix several M2 variants
+under one name.
+
+Architecture ablation for pipeline type, reduction ratio, dropout and loss:
+
+```bash
+python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study architecture
+```
+
+Sensitivity studies:
+
+```bash
+python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study tau
+python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study alpha
+```
+
+Use `--dry_run` to print commands without running them.
+
+## Saliency Maps
+
+After training a checkpoint:
+
+```bash
+python saliency.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl
+```
+
+The script saves side-by-side original/saliency images to `outputs/saliency/`.
+
+## Paper Reference Results
+
+Top-1 accuracy from the paper:
+
+| Dataset | ResNet-18 M2-CL | ResNet-50 M2-CL |
+|---|---:|---:|
+| PACS avg | 83.54 | 85.97 |
+| VLCS avg | 77.78 | 78.36 |
+| Office-Home avg | 63.27 | 71.07 |
+| NICO N=3 | 87.93 | 89.30 |
+| NICO N=5 | 84.10 | 87.68 |
+| NICO N=7 | 82.14 | 86.90 |
+
+The paper compares against DomainBed baselines ERM, RSC, Mixup, CORAL, MMD,
+SagNet, SelfReg, ARM, EQRM and SAGM. This project repo implements all ten
+baseline method entry points plus M2 and M2-CL directly.
 
 ## Project Structure
 
+```text
+models/
+  extraction_block.py   # official-style M2 concentration pipeline
+  m2cl.py               # ERM/M2/M2-CL model builder, ResNet-18/50
+  architecture_baselines.py # explicit architecture baseline model classes
+architecture_specs.py   # shared architecture baseline tags and run settings
+algorithms/
+  baselines.py          # ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM
+losses/
+  contrastive.py        # layer-wise M2-CL contrastive objective
+data/
+  pacs.py vlcs.py office_home.py nico.py
+configs/
+  pacs.yaml vlcs.yaml office_home.yaml nico.yaml
+download_data.py
+check_data.py
+train.py
+evaluate.py
+run_experiments.py
+architecture_baselines.py
+summarize_results.py
+ablation.py
+saliency.py
 ```
-root/
-├── models/
-│   ├── extraction_block.py   # Extraction block with concentration pipelines
-│   └── m2cl.py               # Full M²-CL model (ResNet-18 + 13 extraction blocks)
-├── losses/
-│   └── contrastive.py        # Multi-layer contrastive loss
-├── data/
-│   ├── pacs.py / vlcs.py / office_home.py / nico.py
-├── utils/
-│   └── transforms.py
-├── configs/
-│   ├── pacs.yaml / vlcs.yaml / office_home.yaml / nico.yaml
-├── train.py
-└── evaluate.py
-```
-
-## Key Hyperparameters
-
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| α (loss weight) | 0.01 | α = 1.0 causes ~20% drop |
-| τ (temperature) | 1.0  | Stable in range 0.1–2.0 |
-| r (reduction)   | 4    | Channel compression ratio |
-| dropout p       | 0.5  | Spatial (channel) dropout |
-| embed_dim       | 128  | Per-layer embedding size |

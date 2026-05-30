@@ -1,0 +1,55 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+htmlcov/
+
+# Local environments and secrets
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+
+# IDE and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Datasets and generated experiment outputs
+data_root/
+datasets/
+outputs/
+runs/
+wandb/
+checkpoints/
+
+# Model checkpoints and exported weights
+*.pth
+*.pt
+*.ckpt
+*.onnx
+
+# Downloaded dataset archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Local papers, slides and report exports
+*.pdf
+*.pptx
+*.docx
+
+# Logs and notebook checkpoints
+*.log
+.ipynb_checkpoints/

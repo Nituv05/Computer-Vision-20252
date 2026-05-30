@@ -1,54 +1,50 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class LayerContrastiveLoss(nn.Module):
     """
-    Contrastive loss for a single layer l.
+    Official M2-CL layer loss.
 
-    p^(l)(c) = Σ_{i,j: y_i=y_j=c} exp(u_i^T u_j / τ)
-               ─────────────────────────────────────────
-               Σ_{k,m: k≠m} exp(u_k^T u_m / τ)
-
-    L^(l) = -Σ_c log p^(l)(c)
-    Embeddings u^(l) must already be L2-normalized.
+    This follows `domainbed/lib/myloss.py`: activations are L2-normalized,
+    exponentiated pair similarities are summed over the full batch, and
+    positive same-class pairs contribute log(pos_energy / denominator).
     """
 
     def __init__(self, temperature: float = 1.0):
         super().__init__()
-        self.tau = temperature
+        if temperature <= 0:
+            raise ValueError("temperature must be positive")
+        self.temperature = temperature
 
-    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        # embeddings: (N, D) already L2-normalized
-        # labels:     (N,)
-        sim = torch.mm(embeddings, embeddings.t()) / self.tau  # (N, N)
-        exp_sim = torch.exp(sim)
+    def forward(self, activations: torch.Tensor,
+                labels: torch.Tensor) -> torch.Tensor:
+        if activations.size(0) < 2:
+            return activations.new_tensor(0.0)
 
-        # mask for same class pairs (excluding diagonal)
-        label_eq = labels.unsqueeze(0) == labels.unsqueeze(1)  # (N, N)
-        eye = torch.eye(len(labels), device=labels.device).bool()
-        same_class = label_eq & ~eye
+        normalized = F.normalize(activations, dim=1)
+        all_energy = torch.exp(torch.matmul(normalized, normalized.t()))
+        denominator = all_energy.sum()
+        if denominator <= 0:
+            return activations.new_tensor(0.0)
 
-        # denominator: all off-diagonal pairs
-        off_diag = ~eye
-        denom = exp_sim[off_diag].sum()
-
-        classes = labels.unique()
-        loss = torch.tensor(0.0, device=embeddings.device)
-        for c in classes:
-            pairs = same_class[labels == c][:, labels == c]
-            if pairs.sum() == 0:
+        layer_score = activations.new_tensor(0.0)
+        for cls in labels.unique(sorted=True):
+            indices = torch.nonzero(labels == cls, as_tuple=False).flatten()
+            if indices.numel() < 2:
                 continue
-            numerator = exp_sim[same_class & (labels.unsqueeze(0) == c)].sum()
-            if numerator > 0 and denom > 0:
-                loss = loss - torch.log(numerator / denom)
-        return loss
+            pairs = torch.combinations(indices, r=2)
+            pos_energy = (
+                all_energy[pairs[:, 0], pairs[:, 1]].sum() * 2.0
+            ) / self.temperature
+            if pos_energy > 0:
+                layer_score = layer_score + torch.log(pos_energy / denominator)
+        return layer_score
 
 
 class MultiLayerContrastiveLoss(nn.Module):
-    """
-    Combined loss: L = L_CE + α * Σ_l L^(l)
-    """
+    """Official-style objective: CE - alpha * sum_l layer_score_l."""
 
     def __init__(self, alpha: float = 0.01, temperature: float = 1.0):
         super().__init__()
@@ -57,17 +53,21 @@ class MultiLayerContrastiveLoss(nn.Module):
         self.layer_loss = LayerContrastiveLoss(temperature)
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor,
-                embeddings: list) -> torch.Tensor:
+                activations: list[torch.Tensor]) -> torch.Tensor:
         loss = self.ce(logits, labels)
-        for emb in embeddings:
-            loss = loss + self.alpha * self.layer_loss(emb, labels)
-        return loss
+        if self.alpha == 0 or not activations:
+            return loss
+
+        custom_score = logits.new_tensor(0.0)
+        for activation in activations:
+            custom_score = custom_score + self.layer_loss(activation, labels)
+        return loss - self.alpha * custom_score
 
 
 if __name__ == "__main__":
     criterion = MultiLayerContrastiveLoss()
     logits = torch.randn(8, 7)
     labels = torch.randint(0, 7, (8,))
-    embs = [torch.randn(8, 128) for _ in range(3)]
-    loss = criterion(logits, labels, embs)
+    activations = [torch.randn(8, 4096) for _ in range(3)]
+    loss = criterion(logits, labels, activations)
     print(f"Loss: {loss.item():.4f}")

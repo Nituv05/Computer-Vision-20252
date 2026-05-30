@@ -1,18 +1,24 @@
 dataset: nico
 num_classes: 19
 backbone: resnet18
+pretrained: true
 epochs: 30
 batch_size: 128
 lr: 0.001
 alpha: 0.01
 temperature: 1.0
 reduction_ratio: 4
-dropout_p: 0.5
+dropout_p: 0.3
 embed_dim: 128
+pipeline_type: parallel
+holdout_fraction: 0.2
+scheduler: none
 num_workers: 4
+seed: 0
+heldout_contexts: [3, 5, 7]
 
-# Paper results (Table III, N = held-out contexts)
+# Paper results (Table II, ResNet-18 M2-CL; N = held-out contexts)
 paper_results:
-  N3: 68.43
-  N5: 65.87
-  N7: 62.19
+  N3: 87.93
+  N5: 84.10
+  N7: 82.14
