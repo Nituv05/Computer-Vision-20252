@@ -103,7 +103,11 @@ python run_experiments.py \
   --methods <method_1> <method_2> ... \
   --backbones <resnet18|resnet50> \
   --seeds <seed_1> <seed_2> ... \
+  --epochs <num_epochs> \
   --batch_size <batch_size> \
+  --lr <learning_rate> \
+  --holdout_fraction <source_val_fraction> \
+  --scheduler <none|cosine> \
   --num_workers <num_workers> \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -124,6 +128,34 @@ paper_baselines = ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM
 all = paper_baselines + M2 + M2CL
 ```
 
+Default values used by this project if an option is omitted:
+
+```text
+--methods all
+--backbones resnet18
+--seeds 0 1 2
+--epochs 30
+--batch_size 128
+--lr 0.001
+--holdout_fraction 0.2
+--scheduler none
+--num_workers 4
+--save_dir outputs/checkpoints
+pretrained ImageNet ResNet: enabled
+M2/M2CL alpha: 0.01
+M2/M2CL temperature: 1.0
+M2/M2CL reduction_ratio: 4
+M2/M2CL dropout_p: 0.3
+M2/M2CL embed_dim: 128
+M2/M2CL pipeline_type: parallel
+weight_decay: 5e-4
+mixup_alpha: 0.2
+penalty_weight for CORAL/MMD: 1.0
+```
+
+Use `--no_pretrained` only for debugging when ImageNet weights cannot be
+downloaded. Do not use `--no_pretrained` for final paper-comparison results.
+
 ## 7. Sequential Full Run
 
 Run in this order. Each command is independent and resumable because
@@ -138,7 +170,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 128 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -153,7 +189,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 128 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -168,7 +208,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 128 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -188,7 +232,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet50 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 32 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -207,7 +255,11 @@ python run_experiments.py \
   --methods erm rsc mixup coral \
   --backbones resnet18 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 128 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -222,7 +274,11 @@ python run_experiments.py \
   --methods m2cl \
   --backbones resnet18 \
   --seeds 0 1 2 \
+  --epochs 30 \
   --batch_size 128 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -240,8 +296,8 @@ bash scripts/run_main.sh
 Override options like this:
 
 ```bash
-BACKBONE=resnet50 BATCH_SIZE=32 METHODS="m2cl" DATASETS="pacs" bash scripts/run_main.sh
-METHODS="erm rsc mixup coral" DATASETS="pacs vlcs" bash scripts/run_main.sh
+BACKBONE=resnet50 BATCH_SIZE=32 EPOCHS=30 METHODS="m2cl" DATASETS="pacs" bash scripts/run_main.sh
+METHODS="erm rsc mixup coral" DATASETS="pacs vlcs" EPOCHS=30 bash scripts/run_main.sh
 ```
 
 ## 11. Results

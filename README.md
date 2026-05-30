@@ -139,9 +139,9 @@ Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
 Run the full paper-comparison grid over all domains and seeds:
 
 ```bash
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --seeds 0 1 2
-python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --seeds 0 1 2
-python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --seeds 0 1 2
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
+python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
+python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
 ```
 
 The same ResNet-18 grid can be launched with:
