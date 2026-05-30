@@ -59,7 +59,9 @@ DATA_ROOT=/path/to/data_root bash scripts/check_server_ready.sh
 
 ## 5. Smoke Test
 
-Run this before launching long jobs:
+Run this before launching long jobs. This is only a sanity check for CUDA,
+dependencies, dataset paths and checkpoint writing. Do not use smoke-test
+numbers in the report.
 
 ```bash
 bash scripts/smoke_test.sh
@@ -73,14 +75,22 @@ BATCH_SIZE=32 bash scripts/smoke_test.sh
 
 ## 6. Main Experiments
 
-Default: PACS, VLCS, Office-Home; methods ERM, M2, M2-CL; ResNet-18; seeds
-0, 1, 2; 30 epochs from config.
+Default: PACS, VLCS, Office-Home; ResNet-18; seeds 0, 1, 2; 30 epochs from
+config; all paper comparison methods:
+
+```text
+ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM, M2, M2CL
+```
+
+This is 3 datasets x 4 held-out domains x 12 methods x 3 seeds = 432
+training runs.
 
 ```bash
 bash scripts/run_main_resnet18.sh
 ```
 
-For a faster first pass:
+Debug-only reduced run, if you need to verify the full command grid starts
+correctly. Do not use this as final project evidence:
 
 ```bash
 SEEDS="0" EPOCHS=10 bash scripts/run_main_resnet18.sh
@@ -94,6 +104,24 @@ BATCH_SIZE=64 bash scripts/run_main_resnet18.sh
 
 Resume an interrupted run with the same command. The script passes
 `--skip_existing`, so completed metric files are skipped.
+
+If there is not enough time for all 432 runs, prioritize this order:
+
+```text
+1. M2CL on PACS, VLCS, Office-Home
+2. M2 on PACS, VLCS, Office-Home
+3. ERM on PACS, VLCS, Office-Home
+4. Remaining paper baselines
+```
+
+Commands for priority subsets:
+
+```bash
+METHODS="m2cl" bash scripts/run_main_resnet18.sh
+METHODS="m2" bash scripts/run_main_resnet18.sh
+METHODS="erm" bash scripts/run_main_resnet18.sh
+METHODS="paper_baselines" bash scripts/run_main_resnet18.sh
+```
 
 ## 7. Optional Architecture Ablations
 

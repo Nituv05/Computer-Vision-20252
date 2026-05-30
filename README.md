@@ -136,14 +136,17 @@ python train.py --dataset pacs --test_domain photo --method m2cl --backbone resn
 
 Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
 
-Run a full grid over all domains and seeds:
+Run the full paper-comparison grid over all domains and seeds:
 
 ```bash
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm m2 m2cl --seeds 0 1 2
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods paper_baselines --seeds 0 1 2
 python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --seeds 0 1 2
-python run_experiments.py --dataset nico --data_root /path/to/data_root --methods erm m2 m2cl --nico_values 3 5 7 --seeds 0 1 2
+python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --seeds 0 1 2
+python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --seeds 0 1 2
 ```
+
+`--methods all` runs ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM,
+EQRM, SAGM, M2 and M2-CL. Use `--methods erm m2 m2cl` only as a reduced
+debugging subset, not as the full paper baseline comparison.
 
 Use `--dry_run` first to print the exact commands without training. Use
 `--skip_existing` when resuming an interrupted grid.

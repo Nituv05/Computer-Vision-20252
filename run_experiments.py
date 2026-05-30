@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--methods", nargs="+",
                         choices=[*METHODS, "paper_baselines", "all"],
-                        default=["erm", "m2", "m2cl"])
+                        default=["all"])
     parser.add_argument("--backbones", nargs="+", choices=["resnet18", "resnet50"],
                         default=["resnet18"])
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
