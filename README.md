@@ -144,6 +144,12 @@ python run_experiments.py --dataset vlcs --data_root /path/to/data_root --method
 python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --seeds 0 1 2
 ```
 
+The same ResNet-18 grid can be launched with:
+
+```bash
+bash scripts/run_main.sh
+```
+
 `--methods all` runs ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM,
 EQRM, SAGM, M2 and M2-CL. Use `--methods erm m2 m2cl` only as a reduced
 debugging subset, not as the full paper baseline comparison.
