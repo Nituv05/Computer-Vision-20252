@@ -4,13 +4,16 @@ set -euo pipefail
 DATA_ROOT="${DATA_ROOT:-data_root}"
 BACKBONE="${BACKBONE:-resnet18}"
 SEEDS="${SEEDS:-0 1 2}"
-BATCH_SIZE="${BATCH_SIZE:-128}"
+BATCH_SIZE="${BATCH_SIZE:-}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
 SAVE_DIR="${SAVE_DIR:-outputs/checkpoints}"
 METHODS="${METHODS:-all}"
 DATASETS="${DATASETS:-pacs vlcs office_home}"
 EPOCHS="${EPOCHS:-}"
+STEPS="${STEPS-5001}"
+CHECKPOINT_FREQ="${CHECKPOINT_FREQ-300}"
 LR="${LR:-}"
+HPARAMS_PROFILE="${HPARAMS_PROFILE:-domainbed}"
 WANDB="${WANDB:-0}"
 WANDB_PROJECT="${WANDB_PROJECT:-m2cl-domain-generalization}"
 WANDB_ENTITY="${WANDB_ENTITY:-}"
@@ -27,7 +30,7 @@ COMMON_ARGS=(
   --methods "${METHOD_ARGS[@]}"
   --backbones "${BACKBONE}"
   --seeds "${SEED_ARGS[@]}"
-  --batch_size "${BATCH_SIZE}"
+  --hparams_profile "${HPARAMS_PROFILE}"
   --num_workers "${NUM_WORKERS}"
   --save_dir "${SAVE_DIR}"
   --skip_existing
@@ -35,6 +38,18 @@ COMMON_ARGS=(
 
 if [[ -n "${EPOCHS}" ]]; then
   COMMON_ARGS+=(--epochs "${EPOCHS}")
+fi
+
+if [[ -n "${STEPS}" ]]; then
+  COMMON_ARGS+=(--steps "${STEPS}")
+fi
+
+if [[ -n "${CHECKPOINT_FREQ}" ]]; then
+  COMMON_ARGS+=(--checkpoint_freq "${CHECKPOINT_FREQ}")
+fi
+
+if [[ -n "${BATCH_SIZE}" ]]; then
+  COMMON_ARGS+=(--batch_size "${BATCH_SIZE}")
 fi
 
 if [[ -n "${LR}" ]]; then

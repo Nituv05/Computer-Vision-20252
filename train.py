@@ -13,6 +13,7 @@ import random
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.optim as optim
 import yaml
@@ -25,6 +26,7 @@ from algorithms import METHODS, build_algorithm
 
 def set_seed(seed: int) -> None:
     random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
@@ -48,6 +50,19 @@ def train_one_epoch(algorithm, loader, device):
         total_acc += metrics.get("acc", 0.0)
     n = max(1, len(loader))
     return total_loss / n, total_acc / n
+
+
+def train_one_step(algorithm, batch, device):
+    algorithm.train()
+    batch = move_batch_to_device(batch, device)
+    metrics = algorithm.update(batch)
+    return metrics.get("loss", 0.0), metrics.get("acc", 0.0)
+
+
+def infinite_loader(loader):
+    while True:
+        for batch in loader:
+            yield batch
 
 
 @torch.no_grad()
@@ -92,6 +107,37 @@ class DomainDataset(Dataset):
         return len(self.underlying_dataset)
 
 
+class _CombinedDatasetView:
+    def __init__(self, datasets: list[Dataset]):
+        self.datasets = datasets
+
+    def __len__(self):
+        return sum(len(dataset) for dataset in self.datasets)
+
+
+class MultiDomainLoader:
+    """Yield one minibatch per source environment, matching DomainBed style."""
+
+    def __init__(self, datasets: list[Dataset], batch_size: int,
+                 shuffle: bool, num_workers: int, pin_memory: bool):
+        self.loaders = [
+            DataLoader(
+                dataset, batch_size=batch_size, shuffle=shuffle,
+                num_workers=num_workers, pin_memory=pin_memory
+            )
+            for dataset in datasets
+        ]
+        self.dataset = _CombinedDatasetView(datasets)
+
+    def __iter__(self):
+        for batches in zip(*self.loaders):
+            items = list(zip(*batches))
+            yield tuple(torch.cat(list(values), dim=0) for values in items)
+
+    def __len__(self):
+        return min(len(loader) for loader in self.loaders)
+
+
 def seed_hash(*args) -> int:
     args_str = str(args)
     return int(hashlib.md5(args_str.encode("utf-8")).hexdigest(), 16) % (2 ** 31)
@@ -121,7 +167,8 @@ def _assert_nonempty(name: str, dataset: Dataset) -> None:
 
 def split_source_environments(source_envs: list[Dataset], target_dataset: Dataset,
                               batch_size: int, num_workers: int,
-                              holdout_fraction: float, seed: int):
+                              holdout_fraction: float, seed: int,
+                              domainbed_batching: bool = False):
     """
     Match DomainBed's source-domain split style: each source environment is
     split independently into in/out subsets using seed_hash(trial_seed, env_i).
@@ -132,13 +179,19 @@ def split_source_environments(source_envs: list[Dataset], target_dataset: Datase
     _assert_nonempty("target_env", target_dataset)
 
     if holdout_fraction <= 0:
-        train_dataset = _concat([
+        train_parts = [
             DomainDataset(env, env_i) for env_i, env in enumerate(source_envs)
-        ])
-        train_loader = DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True,
-            num_workers=num_workers, pin_memory=pin_memory
-        )
+        ]
+        if domainbed_batching:
+            train_loader = MultiDomainLoader(
+                train_parts, batch_size, True, num_workers, pin_memory
+            )
+        else:
+            train_dataset = _concat(train_parts)
+            train_loader = DataLoader(
+                train_dataset, batch_size=batch_size, shuffle=True,
+                num_workers=num_workers, pin_memory=pin_memory
+            )
         test_loader = DataLoader(
             target_dataset, batch_size=batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=pin_memory
@@ -157,10 +210,15 @@ def split_source_environments(source_envs: list[Dataset], target_dataset: Datase
     train_dataset = _concat(train_parts)
     val_dataset = _concat(val_parts)
 
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True,
-        num_workers=num_workers, pin_memory=pin_memory
-    )
+    if domainbed_batching:
+        train_loader = MultiDomainLoader(
+            train_parts, batch_size, True, num_workers, pin_memory
+        )
+    else:
+        train_loader = DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True,
+            num_workers=num_workers, pin_memory=pin_memory
+        )
     val_loader = DataLoader(
         val_dataset, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=pin_memory
@@ -293,12 +351,60 @@ def init_wandb(args, cfg: dict, resolved: dict, split_name: str,
                    if value is not None}
     run = wandb.init(**init_kwargs)
     run.define_metric("epoch")
-    run.define_metric("train/*", step_metric="epoch")
-    run.define_metric("val/*", step_metric="epoch")
-    run.define_metric("test/*", step_metric="epoch")
-    run.define_metric("best/*", step_metric="epoch")
-    run.define_metric("optim/*", step_metric="epoch")
+    run.define_metric("step")
+    run.define_metric("train/*", step_metric="step")
+    run.define_metric("val/*", step_metric="step")
+    run.define_metric("test/*", step_metric="step")
+    run.define_metric("best/*", step_metric="step")
+    run.define_metric("optim/*", step_metric="step")
     return run
+
+
+def resolve_default_hparams(args, cfg: dict):
+    method = args.method.lower()
+    is_m2 = method in {"m2", "m2cl"}
+    profile = args.hparams_profile
+
+    if profile == "project":
+        lr = args.lr if args.lr is not None else cfg["lr"]
+        batch_size = (
+            args.batch_size if args.batch_size is not None else cfg["batch_size"]
+        )
+        weight_decay = (
+            args.weight_decay if args.weight_decay is not None else 5e-4
+        )
+        optimizer = args.optimizer or "sgd"
+        eqrm_burnin_iters = (
+            args.eqrm_burnin_iters
+            if args.eqrm_burnin_iters is not None else 100
+        )
+    else:
+        lr = args.lr if args.lr is not None else 5e-5
+        if args.batch_size is not None:
+            batch_size = args.batch_size
+        elif method == "arm":
+            batch_size = 8
+        else:
+            batch_size = 32
+        weight_decay_default = 5e-4 if is_m2 else 0.0
+        weight_decay = (
+            args.weight_decay if args.weight_decay is not None
+            else weight_decay_default
+        )
+        optimizer = args.optimizer or ("sgd" if is_m2 else "adam")
+        eqrm_burnin_iters = (
+            args.eqrm_burnin_iters
+            if args.eqrm_burnin_iters is not None else 2500
+        )
+
+    return {
+        "profile": profile,
+        "lr": lr,
+        "batch_size": batch_size,
+        "weight_decay": weight_decay,
+        "optimizer": optimizer,
+        "eqrm_burnin_iters": eqrm_burnin_iters,
+    }
 
 
 def main():
@@ -314,8 +420,16 @@ def main():
     parser.add_argument("--pipeline_type", choices=["parallel", "cascading"],
                         default=None)
     parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--steps", type=int, default=None,
+                        help="Use DomainBed-style update count instead of epochs")
+    parser.add_argument("--checkpoint_freq", type=int, default=None,
+                        help="Validation/checkpoint interval for --steps")
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--hparams_profile", choices=["domainbed", "project"],
+                        default="domainbed",
+                        help="domainbed uses official DomainBed-style defaults")
+    parser.add_argument("--optimizer", choices=["adam", "sgd"], default=None)
     parser.add_argument("--alpha", type=float, default=None)
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--reduction_ratio", type=int, default=None)
@@ -328,7 +442,7 @@ def main():
                         help=argparse.SUPPRESS)
     parser.add_argument("--num_workers", type=int, default=None)
     parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--weight_decay", type=float, default=5e-4)
+    parser.add_argument("--weight_decay", type=float, default=None)
     parser.add_argument("--mixup_alpha", type=float, default=0.2)
     parser.add_argument("--penalty_weight", type=float, default=1.0,
                         help="CORAL/MMD distribution penalty weight")
@@ -336,7 +450,8 @@ def main():
     parser.add_argument("--rsc_f_drop_factor", type=float, default=1.0 / 3.0)
     parser.add_argument("--rsc_b_drop_factor", type=float, default=1.0 / 3.0)
     parser.add_argument("--eqrm_quantile", type=float, default=0.75)
-    parser.add_argument("--eqrm_burnin_iters", type=int, default=100)
+    parser.add_argument("--eqrm_burnin_iters", type=int, default=None)
+    parser.add_argument("--eqrm_lr", type=float, default=1e-6)
     parser.add_argument("--sam_rho", type=float, default=0.05)
     parser.add_argument("--sagm_gamma", type=float, default=0.1)
     parser.add_argument("--scheduler", choices=["none", "cosine"], default=None)
@@ -361,9 +476,19 @@ def main():
     set_seed(args.seed if args.seed is not None else cfg.get("seed", 0))
 
     seed = args.seed if args.seed is not None else cfg.get("seed", 0)
+    resolved_hparams = resolve_default_hparams(args, cfg)
     epochs = args.epochs if args.epochs is not None else cfg["epochs"]
-    batch_size = args.batch_size if args.batch_size is not None else cfg["batch_size"]
-    lr = args.lr if args.lr is not None else cfg["lr"]
+    steps = args.steps
+    checkpoint_freq = args.checkpoint_freq if args.checkpoint_freq is not None else 300
+    if steps is not None and steps <= 0:
+        raise ValueError("--steps must be a positive integer")
+    if steps is not None and checkpoint_freq <= 0:
+        raise ValueError("--checkpoint_freq must be a positive integer")
+    batch_size = resolved_hparams["batch_size"]
+    lr = resolved_hparams["lr"]
+    optimizer_name = resolved_hparams["optimizer"]
+    weight_decay = resolved_hparams["weight_decay"]
+    eqrm_burnin_iters = resolved_hparams["eqrm_burnin_iters"]
     alpha = args.alpha if args.alpha is not None else cfg["alpha"]
     temperature = (
         args.temperature if args.temperature is not None else cfg["temperature"]
@@ -397,7 +522,8 @@ def main():
         args.dataset, args.data_root, args.test_domain, args.n_heldout, seed
     )
     train_loader, val_loader, test_loader = split_source_environments(
-        source_envs, target_set, batch_size, num_workers, holdout_fraction, seed
+        source_envs, target_set, batch_size, num_workers, holdout_fraction,
+        seed, domainbed_batching=(args.hparams_profile == "domainbed")
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -406,7 +532,9 @@ def main():
         f"Dataset={args.dataset} split={split_name} method={args.method} "
         f"backbone={backbone} train={len(train_loader.dataset)} "
         f"val={len(val_loader.dataset) if val_loader else 0} "
-        f"test={len(test_loader.dataset)} holdout={holdout_fraction}"
+        f"test={len(test_loader.dataset)} holdout={holdout_fraction} "
+        f"profile={args.hparams_profile} "
+        f"steps={steps if steps is not None else 'epoch-mode'}"
     )
 
     algorithm_args = {
@@ -419,7 +547,8 @@ def main():
         "pretrained": pretrained,
         "pipeline_type": pipeline_type,
         "lr": lr,
-        "weight_decay": args.weight_decay,
+        "weight_decay": weight_decay,
+        "optimizer": optimizer_name,
         "alpha": alpha,
         "temperature": temperature,
         "batch_size": batch_size,
@@ -429,7 +558,8 @@ def main():
         "rsc_f_drop_factor": args.rsc_f_drop_factor,
         "rsc_b_drop_factor": args.rsc_b_drop_factor,
         "eqrm_quantile": args.eqrm_quantile,
-        "eqrm_burnin_iters": args.eqrm_burnin_iters,
+        "eqrm_burnin_iters": eqrm_burnin_iters,
+        "eqrm_lr": args.eqrm_lr,
         "sam_rho": args.sam_rho,
         "sagm_gamma": args.sagm_gamma,
         "architecture_tag": args.tag,
@@ -440,11 +570,13 @@ def main():
     for optimizer in algorithm.optimizers():
         for group in optimizer.param_groups:
             group["lr"] = lr
-            group["weight_decay"] = args.weight_decay
+            group["weight_decay"] = weight_decay
     schedulers = []
     if scheduler_name == "cosine":
         schedulers = [
-            optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+            optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=steps if steps is not None else epochs
+            )
             for optimizer in algorithm.optimizers()
         ]
     elif scheduler_name != "none":
@@ -462,6 +594,8 @@ def main():
     resolved_args = {
         "seed": seed,
         "epochs": epochs,
+        "steps": steps,
+        "checkpoint_freq": checkpoint_freq,
         "batch_size": batch_size,
         "lr": lr,
         "alpha": alpha,
@@ -475,72 +609,131 @@ def main():
         "num_workers": num_workers,
         "pretrained": pretrained,
         "scheduler": scheduler_name,
-        "weight_decay": args.weight_decay,
+        "weight_decay": weight_decay,
+        "optimizer": optimizer_name,
+        "hparams_profile": args.hparams_profile,
         "mixup_alpha": args.mixup_alpha,
         "penalty_weight": args.penalty_weight,
         "sag_w_adv": args.sag_w_adv,
         "rsc_f_drop_factor": args.rsc_f_drop_factor,
         "rsc_b_drop_factor": args.rsc_b_drop_factor,
         "eqrm_quantile": args.eqrm_quantile,
-        "eqrm_burnin_iters": args.eqrm_burnin_iters,
+        "eqrm_burnin_iters": eqrm_burnin_iters,
+        "eqrm_lr": args.eqrm_lr,
         "sam_rho": args.sam_rho,
         "sagm_gamma": args.sagm_gamma,
     }
     wandb_run = init_wandb(args, cfg, resolved_args, split_name, ckpt_path)
     best_score = -1.0
-    best_epoch = 0
+    best_progress = 0
+    progress_name = "step" if steps is not None else "epoch"
     score_name = "val" if val_loader is not None else "test"
     score_loader = val_loader if val_loader is not None else test_loader
 
-    for epoch in range(1, epochs + 1):
-        train_loss, train_acc = train_one_epoch(
-            algorithm, train_loader, device
-        )
-        score_acc = evaluate(algorithm, score_loader, device)
-        for scheduler in schedulers:
-            scheduler.step()
+    def save_best_checkpoint(progress_value: int):
+        torch.save({
+            "epoch": progress_value if progress_name == "epoch" else None,
+            "step": progress_value if progress_name == "step" else None,
+            "progress_name": progress_name,
+            "progress": progress_value,
+            "state_dict": algorithm.state_dict(),
+            "score": best_score,
+            "score_name": score_name,
+            "dataset": args.dataset,
+            "split_name": split_name,
+            "method": args.method,
+            "tag": args.tag,
+            "backbone": backbone,
+            "num_classes": cfg["num_classes"],
+            "model_args": checkpoint_algorithm_args,
+            "train_args": {
+                "holdout_fraction": holdout_fraction,
+                "scheduler": scheduler_name,
+                "lr": lr,
+                "batch_size": batch_size,
+                "epochs": epochs,
+                "steps": steps,
+                "checkpoint_freq": checkpoint_freq,
+                "weight_decay": weight_decay,
+                "hparams_profile": args.hparams_profile,
+                "optimizer": optimizer_name,
+            },
+        }, ckpt_path)
 
-        print(
-            f"Epoch {epoch:03d}/{epochs} | loss={train_loss:.4f} "
-            f"| train_acc={train_acc:.4f} | {score_name}_acc={score_acc:.4f}"
-        )
+    if steps is None:
+        for epoch in range(1, epochs + 1):
+            train_loss, train_acc = train_one_epoch(
+                algorithm, train_loader, device
+            )
+            score_acc = evaluate(algorithm, score_loader, device)
+            for scheduler in schedulers:
+                scheduler.step()
 
-        if score_acc > best_score:
-            best_score = score_acc
-            best_epoch = epoch
-            torch.save({
-                "epoch": epoch,
-                "state_dict": algorithm.state_dict(),
-                "score": best_score,
-                "score_name": score_name,
-                "dataset": args.dataset,
-                "split_name": split_name,
-                "method": args.method,
-                "tag": args.tag,
-                "backbone": backbone,
-                "num_classes": cfg["num_classes"],
-                "model_args": checkpoint_algorithm_args,
-                "train_args": {
-                    "holdout_fraction": holdout_fraction,
-                    "scheduler": scheduler_name,
-                    "lr": lr,
-                    "batch_size": batch_size,
-                    "epochs": epochs,
-                    "weight_decay": args.weight_decay,
-                },
-            }, ckpt_path)
+            print(
+                f"Epoch {epoch:03d}/{epochs} | loss={train_loss:.4f} "
+                f"| train_acc={train_acc:.4f} | {score_name}_acc={score_acc:.4f}"
+            )
 
-        if wandb_run is not None:
-            current_lr = algorithm.optimizers()[0].param_groups[0]["lr"]
-            wandb_run.log({
-                "epoch": epoch,
-                "train/loss": train_loss,
-                "train/acc": train_acc,
-                f"{score_name}/acc": score_acc,
-                "best/score": best_score,
-                "best/epoch": best_epoch,
-                "optim/lr": current_lr,
-            }, step=epoch)
+            if score_acc > best_score:
+                best_score = score_acc
+                best_progress = epoch
+                save_best_checkpoint(epoch)
+
+            if wandb_run is not None:
+                current_lr = algorithm.optimizers()[0].param_groups[0]["lr"]
+                wandb_run.log({
+                    "epoch": epoch,
+                    "step": epoch,
+                    "train/loss": train_loss,
+                    "train/acc": train_acc,
+                    f"{score_name}/acc": score_acc,
+                    "best/score": best_score,
+                    "best/epoch": best_progress,
+                    "optim/lr": current_lr,
+                }, step=epoch)
+    else:
+        train_iter = infinite_loader(train_loader)
+        running_loss, running_acc, running_count = 0.0, 0.0, 0
+        for step in tqdm(range(1, steps + 1), desc="Train steps"):
+            train_loss, train_acc = train_one_step(
+                algorithm, next(train_iter), device
+            )
+            running_loss += train_loss
+            running_acc += train_acc
+            running_count += 1
+            for scheduler in schedulers:
+                scheduler.step()
+
+            should_eval = step % checkpoint_freq == 0 or step == steps
+            if not should_eval:
+                continue
+
+            avg_loss = running_loss / max(1, running_count)
+            avg_acc = running_acc / max(1, running_count)
+            score_acc = evaluate(algorithm, score_loader, device)
+            running_loss, running_acc, running_count = 0.0, 0.0, 0
+
+            print(
+                f"Step {step:05d}/{steps} | loss={avg_loss:.4f} "
+                f"| train_acc={avg_acc:.4f} | {score_name}_acc={score_acc:.4f}"
+            )
+
+            if score_acc > best_score:
+                best_score = score_acc
+                best_progress = step
+                save_best_checkpoint(step)
+
+            if wandb_run is not None:
+                current_lr = algorithm.optimizers()[0].param_groups[0]["lr"]
+                wandb_run.log({
+                    "step": step,
+                    "train/loss": avg_loss,
+                    "train/acc": avg_acc,
+                    f"{score_name}/acc": score_acc,
+                    "best/score": best_score,
+                    "best/step": best_progress,
+                    "optim/lr": current_lr,
+                }, step=step)
 
     ckpt = torch.load(ckpt_path, map_location=device)
     algorithm.load_state_dict(ckpt["state_dict"])
@@ -553,14 +746,21 @@ def main():
         "tag": args.tag,
         "backbone": backbone,
         "seed": seed,
-        "best_epoch": best_epoch,
+        "best_epoch": best_progress if progress_name == "epoch" else None,
+        "best_step": best_progress if progress_name == "step" else None,
+        "progress_name": progress_name,
         f"best_{score_name}_acc": best_score,
         "test_acc": test_acc,
         "holdout_fraction": holdout_fraction,
         "scheduler": scheduler_name,
         "lr": lr,
+        "optimizer": optimizer_name,
+        "hparams_profile": args.hparams_profile,
         "batch_size": batch_size,
         "epochs": epochs,
+        "steps": steps,
+        "checkpoint_freq": checkpoint_freq,
+        "weight_decay": weight_decay,
         "checkpoint": str(ckpt_path),
     }
     metrics_path = ckpt_path.with_suffix(".json")
@@ -568,20 +768,28 @@ def main():
         json.dump(metrics, f, indent=2)
 
     if wandb_run is not None:
-        wandb_run.log({
-            "epoch": epochs + 1,
+        final_step = steps + 1 if steps is not None else epochs + 1
+        final_log = {
+            "step": final_step,
             "test/acc": test_acc,
             "best/final_score": best_score,
-            "best/final_epoch": best_epoch,
-        }, step=epochs + 1)
+        }
+        if progress_name == "epoch":
+            final_log["epoch"] = epochs + 1
+            final_log["best/final_epoch"] = best_progress
+        else:
+            final_log["best/final_step"] = best_progress
+        wandb_run.log({
+            **final_log,
+        }, step=final_step)
         wandb_run.summary["test_acc"] = test_acc
         wandb_run.summary[f"best_{score_name}_acc"] = best_score
-        wandb_run.summary["best_epoch"] = best_epoch
+        wandb_run.summary[f"best_{progress_name}"] = best_progress
         wandb_run.summary["checkpoint"] = str(ckpt_path)
         wandb_run.summary["metrics_json"] = str(metrics_path)
         wandb_run.finish()
 
-    print(f"\nBest epoch: {best_epoch} ({score_name}_acc={best_score:.4f})")
+    print(f"\nBest {progress_name}: {best_progress} ({score_name}_acc={best_score:.4f})")
     print(f"Final test accuracy: {test_acc:.4f}")
     print(f"Saved checkpoint: {ckpt_path}")
     print(f"Saved metrics: {metrics_path}")

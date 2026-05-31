@@ -1,6 +1,7 @@
 import math
 from dataclasses import dataclass
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,6 +30,7 @@ class AlgorithmConfig:
     method: str
     backbone: str = "resnet18"
     pretrained: bool = True
+    optimizer: str = "adam"
     lr: float = 1e-3
     weight_decay: float = 5e-4
     momentum: float = 0.9
@@ -46,6 +48,7 @@ class AlgorithmConfig:
     rsc_b_drop_factor: float = 1.0 / 3.0
     eqrm_quantile: float = 0.75
     eqrm_burnin_iters: int = 100
+    eqrm_lr: float = 1e-6
     sam_rho: float = 0.05
     sagm_gamma: float = 0.1
     architecture_tag: str | None = None
@@ -131,6 +134,163 @@ def parse_batch(batch):
     return x, y, domains
 
 
+def domain_minibatches(batch):
+    x, y, domains = parse_batch(batch)
+    minibatches = []
+    for domain in domains.unique(sorted=True):
+        idx = torch.nonzero(domains == domain, as_tuple=False).flatten()
+        if idx.numel() > 0:
+            minibatches.append((x[idx], y[idx]))
+    if not minibatches:
+        minibatches.append((x, y))
+    return minibatches
+
+
+def cat_minibatches(minibatches):
+    return (
+        torch.cat([x for x, _ in minibatches]),
+        torch.cat([y for _, y in minibatches]),
+    )
+
+
+def random_pairs_of_minibatches(minibatches):
+    perm = torch.randperm(len(minibatches)).tolist()
+    pairs = []
+    for i in range(len(minibatches)):
+        j = i + 1 if i < (len(minibatches) - 1) else 0
+        xi, yi = minibatches[perm[i]]
+        xj, yj = minibatches[perm[j]]
+        n = min(len(xi), len(xj))
+        if n > 0:
+            pairs.append(((xi[:n], yi[:n]), (xj[:n], yj[:n])))
+    return pairs
+
+
+class Kernel(nn.Module):
+    def __init__(self, bw=None):
+        super().__init__()
+        self.bw = 0.05 if bw is None else bw
+
+    def _diffs(self, test_xs, train_xs):
+        test_xs = test_xs.view(test_xs.shape[0], 1, *test_xs.shape[1:])
+        train_xs = train_xs.view(1, train_xs.shape[0], *train_xs.shape[1:])
+        return test_xs - train_xs
+
+
+class GaussianKernel(Kernel):
+    def forward(self, test_xs, train_xs):
+        diffs = self._diffs(test_xs, train_xs)
+        dims = tuple(range(len(diffs.shape))[2:])
+        x_sq = diffs ** 2 if dims == () else torch.norm(diffs, p=2, dim=dims) ** 2
+        var = self.bw ** 2
+        coef = 1.0 / torch.sqrt(2 * np.pi * var)
+        return (coef * torch.exp(-x_sq / (2 * var))).mean(dim=1)
+
+    def sample(self, train_xs):
+        noise = torch.randn(train_xs.shape, device=train_xs.device) * self.bw
+        return train_xs + noise
+
+    def cdf(self, test_xs, train_xs):
+        mus = train_xs
+        sigmas = torch.ones(len(mus), device=test_xs.device) * self.bw
+        x = test_xs.repeat(len(mus), 1).T
+        return torch.mean(torch.distributions.Normal(mus, sigmas).cdf(x))
+
+
+def estimate_bandwidth(x, method="silverman"):
+    x, _ = torch.sort(x)
+    n = len(x)
+    if n < 2:
+        return torch.ones((), device=x.device, dtype=x.dtype) * 1e-6
+    sample_std = torch.std(x, unbiased=True).clamp_min(1e-12)
+    method = method.lower()
+    if method == "silverman":
+        iqr = torch.quantile(x, 0.75) - torch.quantile(x, 0.25)
+        bandwidth = 0.9 * torch.min(sample_std, iqr / 1.34) * n ** (-0.2)
+    elif method == "gauss-optimal":
+        bandwidth = 1.06 * sample_std * (n ** -0.2)
+    else:
+        raise ValueError(f"Invalid bandwidth method: {method}")
+    return bandwidth.clamp_min(1e-6)
+
+
+class KernelDensityEstimator(nn.Module):
+    def __init__(self, train_xs, kernel="gaussian", bw_select="Gauss-optimal"):
+        super().__init__()
+        self.train_xs = train_xs
+        self._n_kernels = len(train_xs)
+        self.bw = (
+            estimate_bandwidth(self.train_xs, bw_select)
+            if bw_select is not None else None
+        )
+        if kernel.lower() != "gaussian":
+            raise NotImplementedError(f"'{kernel}' kernel not implemented.")
+        self.kernel = GaussianKernel(self.bw)
+
+    def forward(self, x):
+        return self.kernel(x, self.train_xs)
+
+    def sample(self, n_samples):
+        idxs = np.random.choice(range(self._n_kernels), size=n_samples)
+        return self.kernel.sample(self.train_xs[idxs])
+
+    def cdf(self, x):
+        return self.kernel.cdf(x, self.train_xs)
+
+
+def continuous_bisect_fun_left(f, value, lo, hi, n_steps=32):
+    val_range = [lo, hi]
+    k = 0.5 * sum(val_range)
+    for _ in range(n_steps):
+        val_range[int((f(k) > value).detach().cpu().item())] = k
+        next_k = 0.5 * sum(val_range)
+        if bool((next_k == k).detach().cpu().item()):
+            break
+        k = next_k
+    return k
+
+
+class Nonparametric:
+    def __init__(self, use_kde=True, bw_select="Gauss-optimal"):
+        self.use_kde = use_kde
+        self.bw_select = bw_select
+        self.bw = None
+        self.data = None
+        self.kde = None
+
+    def estimate_parameters(self, x):
+        self.data, _ = torch.sort(x)
+        if self.use_kde:
+            self.kde = KernelDensityEstimator(self.data, bw_select=self.bw_select)
+            self.bw = torch.ones(1, device=self.data.device) * self.kde.bw
+
+    def _empirical_icdf(self, q_value):
+        if self.data.numel() == 1:
+            return self.data[0]
+        rank = q_value * (self.data.numel() - 1)
+        low = int(math.floor(rank))
+        high = int(math.ceil(rank))
+        weight = rank - low
+        return self.data[low] * (1.0 - weight) + self.data[high] * weight
+
+    def icdf(self, q):
+        if torch.is_tensor(q):
+            q_value = float(q.detach().cpu().item())
+            q_tensor = q.to(device=self.data.device, dtype=self.data.dtype)
+        else:
+            q_value = float(q)
+            q_tensor = torch.tensor(q_value, device=self.data.device,
+                                    dtype=self.data.dtype)
+        if not self.use_kde or self.data.numel() < 2:
+            return self._empirical_icdf(q_value)
+        if q_value >= 0:
+            lo = torch.distributions.Normal(self.data[0], self.bw[0]).icdf(q_tensor)
+            hi = torch.distributions.Normal(self.data[-1], self.bw[-1]).icdf(q_tensor)
+            return continuous_bisect_fun_left(self.kde.cdf, q_tensor, lo, hi)
+        log_y = q_value
+        return torch.mean(self.data + self.bw * math.sqrt(-2 * log_y))
+
+
 def accuracy_from_logits(logits: torch.Tensor, labels: torch.Tensor) -> float:
     return (logits.argmax(1) == labels).float().mean().item()
 
@@ -194,12 +354,21 @@ class Algorithm(nn.Module):
         self.optimizer = None
 
     def configure_optimizer(self, parameters):
-        self.optimizer = torch.optim.SGD(
-            parameters,
-            lr=self.cfg.lr,
-            momentum=self.cfg.momentum,
-            weight_decay=self.cfg.weight_decay,
-        )
+        if self.cfg.optimizer == "adam":
+            self.optimizer = torch.optim.Adam(
+                parameters,
+                lr=self.cfg.lr,
+                weight_decay=self.cfg.weight_decay,
+            )
+        elif self.cfg.optimizer == "sgd":
+            self.optimizer = torch.optim.SGD(
+                parameters,
+                lr=self.cfg.lr,
+                momentum=self.cfg.momentum,
+                weight_decay=self.cfg.weight_decay,
+            )
+        else:
+            raise ValueError(f"Unknown optimizer: {self.cfg.optimizer}")
 
     def optimizers(self):
         return [self.optimizer] if self.optimizer is not None else []
@@ -209,6 +378,119 @@ class Algorithm(nn.Module):
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
+
+
+def disable_running_stats(model):
+    def _disable(module):
+        if isinstance(module, nn.modules.batchnorm._BatchNorm):
+            module.backup_momentum = module.momentum
+            module.momentum = 0
+    model.apply(_disable)
+
+
+def enable_running_stats(model):
+    def _enable(module):
+        if isinstance(module, nn.modules.batchnorm._BatchNorm):
+            if hasattr(module, "backup_momentum"):
+                module.momentum = module.backup_momentum
+    model.apply(_enable)
+
+
+class ConstantScheduler:
+    def __init__(self, value: float):
+        self.value = value
+
+    def step(self):
+        return self.value
+
+
+class SAGMOptimizer(torch.optim.Optimizer):
+    """Minimal single-process port of the official M2CL SAGM optimizer."""
+
+    def __init__(self, params, base_optimizer, model, alpha: float,
+                 rho_scheduler, adaptive: bool = False,
+                 perturb_eps: float = 1e-12):
+        super().__init__(params, dict(adaptive=adaptive))
+        self.model = model
+        self.base_optimizer = base_optimizer
+        self.param_groups = self.base_optimizer.param_groups
+        self.alpha = alpha
+        self.rho_scheduler = rho_scheduler
+        self.adaptive = adaptive
+        self.perturb_eps = perturb_eps
+        self.update_rho_t()
+
+    @torch.no_grad()
+    def update_rho_t(self):
+        self.rho_t = self.rho_scheduler.step()
+        return self.rho_t
+
+    @torch.no_grad()
+    def _grad_norm(self):
+        norms = [
+            ((torch.abs(p.data) if self.adaptive else 1.0) * p.grad).norm(p=2)
+            for group in self.param_groups
+            for p in group["params"]
+            if p.grad is not None
+        ]
+        if not norms:
+            return torch.tensor(0.0)
+        return torch.norm(torch.stack(norms), p=2)
+
+    @torch.no_grad()
+    def perturb_weights(self, rho: float):
+        grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = rho / (grad_norm + self.perturb_eps) - self.alpha
+            for param in group["params"]:
+                if param.grad is None:
+                    continue
+                self.state[param]["old_g"] = param.grad.data.clone()
+                perturb = param.grad * scale.to(param)
+                if self.adaptive:
+                    perturb *= torch.pow(param, 2)
+                param.add_(perturb)
+                self.state[param]["e_w"] = perturb
+
+    @torch.no_grad()
+    def unperturb(self):
+        for group in self.param_groups:
+            for param in group["params"]:
+                if "e_w" in self.state[param]:
+                    param.data.sub_(self.state[param]["e_w"])
+
+    @torch.no_grad()
+    def gradient_decompose(self):
+        for group in self.param_groups:
+            for param in group["params"]:
+                if param.grad is None:
+                    continue
+                sam_grad = self.state[param]["old_g"] * 0.5 - param.grad * 0.5
+                param.grad.data.add_(sam_grad)
+
+    def set_closure(self, loss_fn, inputs, targets):
+        def get_grad():
+            self.base_optimizer.zero_grad(set_to_none=True)
+            with torch.enable_grad():
+                outputs = self.model(inputs)
+                loss = loss_fn(outputs, targets)
+            loss_value = loss.detach().clone()
+            loss.backward()
+            return outputs, loss_value
+        self.forward_backward_func = get_grad
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        get_grad = closure if closure is not None else self.forward_backward_func
+        outputs, loss_value = get_grad()
+        self.perturb_weights(rho=self.rho_t)
+        disable_running_stats(self.model)
+        get_grad()
+        self.gradient_decompose()
+        self.unperturb()
+        self.base_optimizer.step()
+        enable_running_stats(self.model)
+        return outputs, loss_value
 
 
 class M2Algorithm(Algorithm):
@@ -241,7 +523,8 @@ class M2Algorithm(Algorithm):
         self.configure_optimizer(self.model.parameters())
 
     def update(self, batch):
-        x, y, _ = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
         logits, embeddings = self.model(x)
         loss = self.criterion(logits, y, embeddings)
         self.optimizer.zero_grad(set_to_none=True)
@@ -275,7 +558,8 @@ class ResNetAlgorithm(Algorithm):
         return self.logits_from_features(self.forward_features(x))
 
     def objective(self, batch):
-        x, y, _ = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
         logits = self.predict(x)
         loss = F.cross_entropy(logits, y)
         return loss, logits, {"loss": loss.item()}
@@ -292,41 +576,34 @@ class ResNetAlgorithm(Algorithm):
 
 class MixupAlgorithm(ResNetAlgorithm):
     def objective(self, batch):
-        x, y, domains = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
         alpha = self.cfg.mixup_alpha
         if alpha <= 0:
             logits = self.predict(x)
             loss = F.cross_entropy(logits, y)
             return loss, logits, {"loss": loss.item()}
 
-        groups = split_by_domain(x, y, domains)
-        if len(groups) < 2:
+        if len(minibatches) < 2:
             perm = torch.randperm(x.size(0), device=x.device)
-            lam = torch.distributions.Beta(alpha, alpha).sample().to(x.device)
+            lam = float(np.random.beta(alpha, alpha))
             mixed_x = lam * x + (1.0 - lam) * x[perm]
             logits = self.predict(mixed_x)
             loss = lam * F.cross_entropy(logits, y)
             loss = loss + (1.0 - lam) * F.cross_entropy(logits, y[perm])
             return loss, self.predict(x), {"loss": loss.item()}
 
-        order = torch.randperm(len(groups), device=x.device).tolist()
-        losses = []
-        for i, j in zip(order, order[1:] + order[:1]):
-            xi, yi = groups[i]
-            xj, yj = groups[j]
-            n = min(xi.size(0), xj.size(0))
-            if n == 0:
-                continue
-            lam = torch.distributions.Beta(alpha, alpha).sample().to(x.device)
-            mixed_x = lam * xi[:n] + (1.0 - lam) * xj[:n]
+        objective = x.new_tensor(0.0)
+        pairs = random_pairs_of_minibatches(minibatches)
+        for (xi, yi), (xj, yj) in pairs:
+            lam = float(np.random.beta(alpha, alpha))
+            mixed_x = lam * xi + (1.0 - lam) * xj
             mixed_logits = self.predict(mixed_x)
-            losses.append(
-                lam * F.cross_entropy(mixed_logits, yi[:n])
-                + (1.0 - lam) * F.cross_entropy(mixed_logits, yj[:n])
+            objective = objective + lam * F.cross_entropy(mixed_logits, yi)
+            objective = objective + (1.0 - lam) * F.cross_entropy(
+                mixed_logits, yj
             )
-        loss = torch.stack(losses).mean() if losses else F.cross_entropy(
-            self.predict(x), y
-        )
+        loss = objective / max(1, len(minibatches))
         return loss, self.predict(x), {"loss": loss.item()}
 
 
@@ -334,13 +611,25 @@ class DistributionMatchingAlgorithm(ResNetAlgorithm):
     penalty = staticmethod(coral_penalty)
 
     def objective(self, batch):
-        x, y, domains = parse_batch(batch)
-        features = self.forward_features(x)
-        logits = self.logits_from_features(features)
-        objective = F.cross_entropy(logits, y)
-        groups = split_by_domain(features, y, domains)
-        penalty = pairwise_mean_penalty(groups, self.penalty)
+        minibatches = domain_minibatches(batch)
+        features = [self.forward_features(xi) for xi, _ in minibatches]
+        logits_by_domain = [
+            self.logits_from_features(feat) for feat in features
+        ]
+        targets = [yi for _, yi in minibatches]
+        objective = sum(
+            F.cross_entropy(logits, target)
+            for logits, target in zip(logits_by_domain, targets)
+        ) / len(minibatches)
+        penalty = objective.new_tensor(0.0)
+        for i in range(len(minibatches)):
+            for j in range(i + 1, len(minibatches)):
+                if len(features[i]) > 1 and len(features[j]) > 1:
+                    penalty = penalty + self.penalty(features[i], features[j])
+        if len(minibatches) > 1:
+            penalty = penalty / (len(minibatches) * (len(minibatches) - 1) / 2)
         loss = objective + self.cfg.penalty_weight * penalty
+        logits = torch.cat(logits_by_domain)
         return loss, logits, {
             "loss": loss.item(),
             "ce": objective.item(),
@@ -358,7 +647,8 @@ class MMDAlgorithm(DistributionMatchingAlgorithm):
 
 class RSCAlgorithm(ResNetAlgorithm):
     def objective(self, batch):
-        x, y, _ = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
         features = self.forward_features(x)
         features.requires_grad_(True)
         logits = self.logits_from_features(features)
@@ -400,10 +690,10 @@ class SelfRegAlgorithm(ResNetAlgorithm):
             nn.Linear(hidden_dim, input_dim),
             nn.BatchNorm1d(input_dim),
         )
-        self.configure_optimizer(self.parameters())
 
     def objective(self, batch):
-        x, y, _ = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
         if x.size(0) < 2:
             logits = self.predict(x)
             loss = F.cross_entropy(logits, y)
@@ -438,7 +728,7 @@ class SelfRegAlgorithm(ResNetAlgorithm):
             feat_2[start:end] = projected[perm_1]
             feat_3[start:end] = projected[perm_2]
 
-        lam = torch.distributions.Beta(0.5, 0.5).sample().to(x.device)
+        lam = float(np.random.beta(0.5, 0.5))
         logits_mix = lam * logits_2 + (1.0 - lam) * logits_3
         feat_mix = lam * feat_2 + (1.0 - lam) * feat_3
 
@@ -456,7 +746,6 @@ class ARMAlgorithm(ResNetAlgorithm):
         super().__init__(cfg, in_channels=4)
         self.context_net = ContextNet(in_channels=3)
         self.support_size = cfg.batch_size
-        self.configure_optimizer(self.parameters())
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, _, height, width = x.shape
@@ -481,17 +770,14 @@ class SagNetAlgorithm(Algorithm):
         self.network_f = ResNetFeaturizer(cfg.backbone, cfg.pretrained)
         self.network_c = LinearClassifier(self.network_f.n_outputs, cfg.num_classes)
         self.network_s = LinearClassifier(self.network_f.n_outputs, cfg.num_classes)
-        self.optimizer_f = torch.optim.SGD(
-            self.network_f.parameters(), lr=cfg.lr, momentum=cfg.momentum,
-            weight_decay=cfg.weight_decay
+        self.optimizer_f = torch.optim.Adam(
+            self.network_f.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
         )
-        self.optimizer_c = torch.optim.SGD(
-            self.network_c.parameters(), lr=cfg.lr, momentum=cfg.momentum,
-            weight_decay=cfg.weight_decay
+        self.optimizer_c = torch.optim.Adam(
+            self.network_c.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
         )
-        self.optimizer_s = torch.optim.SGD(
-            self.network_s.parameters(), lr=cfg.lr, momentum=cfg.momentum,
-            weight_decay=cfg.weight_decay
+        self.optimizer_s = torch.optim.Adam(
+            self.network_s.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
         )
 
     def optimizers(self):
@@ -526,7 +812,8 @@ class SagNetAlgorithm(Algorithm):
         return self.network_s(self.randomize(self.network_f(x), "content"))
 
     def update(self, batch):
-        x, y, _ = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
 
         self.optimizer_f.zero_grad(set_to_none=True)
         self.optimizer_c.zero_grad(set_to_none=True)
@@ -564,120 +851,82 @@ class EQRMAlgorithm(ResNetAlgorithm):
     def __init__(self, cfg: AlgorithmConfig):
         super().__init__(cfg)
         self.register_buffer("update_count", torch.tensor(0, dtype=torch.long))
+        self.register_buffer(
+            "eqrm_alpha", torch.tensor(cfg.eqrm_quantile, dtype=torch.float32)
+        )
+        self.dist = Nonparametric()
 
     def objective(self, batch):
-        x, y, domains = parse_batch(batch)
+        minibatches = domain_minibatches(batch)
+        env_risks = torch.cat([
+            F.cross_entropy(self.predict(xi), yi).reshape(1)
+            for xi, yi in minibatches
+        ])
+        x, _ = cat_minibatches(minibatches)
         logits = self.predict(x)
-        losses = []
-        for domain in domains.unique(sorted=True):
-            idx = torch.nonzero(domains == domain, as_tuple=False).flatten()
-            if idx.numel() > 0:
-                losses.append(F.cross_entropy(logits[idx], y[idx]))
-        env_risks = torch.stack(losses) if losses else F.cross_entropy(
-            logits, y
-        ).reshape(1)
 
         if int(self.update_count.item()) < self.cfg.eqrm_burnin_iters:
             loss = env_risks.mean()
         else:
-            loss = torch.quantile(env_risks, self.cfg.eqrm_quantile)
+            self.dist.estimate_parameters(env_risks)
+            loss = self.dist.icdf(self.eqrm_alpha)
         return loss, logits, {
             "loss": loss.item(),
             "risk_mean": env_risks.mean().item(),
         }
 
     def update(self, batch):
-        metrics = super().update(batch)
+        if int(self.update_count.item()) == self.cfg.eqrm_burnin_iters:
+            self.optimizer = torch.optim.Adam(
+                self.parameters(),
+                lr=self.cfg.eqrm_lr,
+                weight_decay=self.cfg.weight_decay,
+            )
+        loss, logits, metrics = self.objective(batch)
+        self.optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        self.optimizer.step()
+        minibatches = domain_minibatches(batch)
+        _, y = cat_minibatches(minibatches)
+        metrics["acc"] = accuracy_from_logits(logits, y)
         self.update_count += 1
         return metrics
 
 
 class SAGMAlgorithm(ResNetAlgorithm):
-    def gradient_matching_penalty(self, features, logits, labels, domains):
-        grads = []
-        for domain in domains.unique(sorted=True):
-            idx = torch.nonzero(domains == domain, as_tuple=False).flatten()
-            if idx.numel() == 0:
-                continue
-            loss_i = F.cross_entropy(logits[idx], labels[idx])
-            grad_i = autograd.grad(
-                loss_i,
-                features,
-                retain_graph=True,
-                create_graph=True,
-                allow_unused=True,
-            )[0]
-            if grad_i is not None:
-                grads.append(grad_i[idx].mean(0))
-        if len(grads) < 2:
-            return features.new_tensor(0.0)
+    def __init__(self, cfg: AlgorithmConfig):
+        super().__init__(cfg)
+        self.base_optimizer = torch.optim.Adam(
+            self.parameters(),
+            lr=cfg.lr,
+            weight_decay=cfg.weight_decay,
+        )
+        self.sagm_optimizer = SAGMOptimizer(
+            params=self.parameters(),
+            base_optimizer=self.base_optimizer,
+            model=self,
+            alpha=cfg.sagm_gamma,
+            rho_scheduler=ConstantScheduler(cfg.sam_rho),
+            adaptive=False,
+        )
 
-        penalties = []
-        for i in range(len(grads)):
-            for j in range(i + 1, len(grads)):
-                penalties.append(
-                    1.0 - F.cosine_similarity(
-                        grads[i].flatten(), grads[j].flatten(), dim=0
-                    )
-                )
-        return torch.stack(penalties).mean()
-
-    def objective(self, batch):
-        x, y, domains = parse_batch(batch)
-        features = self.forward_features(x)
-        logits = self.logits_from_features(features)
-        ce = F.cross_entropy(logits, y)
-        penalty = self.gradient_matching_penalty(features, logits, y, domains)
-        loss = ce + self.cfg.sagm_gamma * penalty
-        return loss, logits, {
-            "loss": loss.item(),
-            "ce": ce.item(),
-            "gm_penalty": penalty.item(),
-        }
-
-    def _grad_norm(self) -> torch.Tensor:
-        norms = []
-        for param in self.parameters():
-            if param.grad is not None:
-                norms.append(param.grad.norm(p=2))
-        if not norms:
-            return torch.tensor(0.0)
-        return torch.norm(torch.stack(norms), p=2)
-
-    def _add_sam_perturbation(self, scale: torch.Tensor):
-        perturbations = []
-        for param in self.parameters():
-            if param.grad is None:
-                perturbations.append(None)
-                continue
-            perturb = param.grad * scale.to(param.device)
-            param.data.add_(perturb)
-            perturbations.append(perturb)
-        return perturbations
-
-    def _remove_sam_perturbation(self, perturbations):
-        for param, perturb in zip(self.parameters(), perturbations):
-            if perturb is not None:
-                param.data.sub_(perturb)
+    def optimizers(self):
+        return [self.base_optimizer]
 
     def update(self, batch):
-        x, y, _ = parse_batch(batch)
-        loss, logits, metrics = self.objective(batch)
-        self.optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        grad_norm = self._grad_norm()
-        scale = self.cfg.sam_rho / (grad_norm + 1e-12)
-        perturbations = self._add_sam_perturbation(scale)
+        minibatches = domain_minibatches(batch)
+        x, y = cat_minibatches(minibatches)
 
-        sharp_loss, sharp_logits, sharp_metrics = self.objective(batch)
-        self.optimizer.zero_grad(set_to_none=True)
-        sharp_loss.backward()
-        self._remove_sam_perturbation(perturbations)
-        self.optimizer.step()
+        def loss_fn(predictions, targets):
+            return F.cross_entropy(predictions, targets)
 
-        metrics["sharp_loss"] = sharp_metrics["loss"]
-        metrics["acc"] = accuracy_from_logits(sharp_logits.detach(), y)
-        return metrics
+        self.sagm_optimizer.set_closure(loss_fn, x, y)
+        logits, loss = self.sagm_optimizer.step()
+        self.sagm_optimizer.update_rho_t()
+        return {
+            "loss": loss.item(),
+            "acc": accuracy_from_logits(logits.detach(), y),
+        }
 
 
 def build_algorithm(**kwargs) -> Algorithm:

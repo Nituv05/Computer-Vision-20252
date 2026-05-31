@@ -28,7 +28,13 @@ The default protocol is prepared for running numbers:
   `holdout_fraction=0.2`;
 - checkpoint selection uses source validation accuracy, not target-test
   accuracy;
-- optimizer defaults to SGD, `lr=0.001`, `batch_size=128`, `epochs=30`;
+- `hparams_profile=domainbed` uses DomainBed-style defaults for baselines:
+  Adam, `lr=5e-5`, `weight_decay=0`, and per-domain `batch_size=32`
+  (`batch_size=8` for ARM);
+- M2/M2-CL use SGD with momentum 0.9 and `weight_decay=5e-4`;
+- epoch training defaults to `epochs=30` for compatibility;
+- use `--steps 5001 --checkpoint_freq 300` for the closer
+  DomainBed-style update/checkpoint schedule;
 - scheduler defaults to `none`.
 
 ## Setup
@@ -139,9 +145,9 @@ Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
 Run the full paper-comparison grid over all domains and seeds:
 
 ```bash
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
-python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
-python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 128 --lr 0.001 --holdout_fraction 0.2 --scheduler none
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --steps 5001 --checkpoint_freq 300 --holdout_fraction 0.2 --scheduler none --hparams_profile domainbed
+python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --steps 5001 --checkpoint_freq 300 --holdout_fraction 0.2 --scheduler none --hparams_profile domainbed
+python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --steps 5001 --checkpoint_freq 300 --holdout_fraction 0.2 --scheduler none --hparams_profile domainbed
 ```
 
 The same ResNet-18 grid can be launched with:
@@ -161,7 +167,7 @@ Optional W&B logging:
 
 ```bash
 wandb login
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm mixup coral rsc sagm m2 m2cl --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 64 --wandb --wandb_project cv20252-m2cl --skip_existing
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm mixup coral rsc sagm m2 m2cl --backbones resnet18 --seeds 0 1 2 --steps 5001 --checkpoint_freq 300 --hparams_profile domainbed --wandb --wandb_project cv20252-m2cl --skip_existing
 ```
 
 ## Evaluate

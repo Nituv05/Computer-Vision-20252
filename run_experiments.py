@@ -36,8 +36,14 @@ def main():
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--nico_values", nargs="+", type=int, default=[3, 5, 7])
     parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--steps", type=int, default=None)
+    parser.add_argument("--checkpoint_freq", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--hparams_profile", choices=["domainbed", "project"],
+                        default="domainbed")
+    parser.add_argument("--optimizer", choices=["adam", "sgd"], default=None)
+    parser.add_argument("--weight_decay", type=float, default=None)
     parser.add_argument("--holdout_fraction", type=float, default=None)
     parser.add_argument("--num_workers", type=int, default=None)
     parser.add_argument("--scheduler", choices=["none", "cosine"], default=None)
@@ -45,6 +51,7 @@ def main():
     parser.add_argument("--mixup_alpha", type=float, default=None)
     parser.add_argument("--sam_rho", type=float, default=None)
     parser.add_argument("--sagm_gamma", type=float, default=None)
+    parser.add_argument("--eqrm_lr", type=float, default=None)
     parser.add_argument("--save_dir", default="./outputs/checkpoints")
     parser.add_argument("--skip_existing", action="store_true")
     parser.add_argument("--dry_run", action="store_true")
@@ -89,8 +96,19 @@ def main():
                         command.extend(["--test_domain", split_value])
 
                     append_if_not_none(command, "--epochs", args.epochs)
+                    append_if_not_none(command, "--steps", args.steps)
+                    append_if_not_none(
+                        command, "--checkpoint_freq", args.checkpoint_freq
+                    )
                     append_if_not_none(command, "--batch_size", args.batch_size)
                     append_if_not_none(command, "--lr", args.lr)
+                    append_if_not_none(
+                        command, "--hparams_profile", args.hparams_profile
+                    )
+                    append_if_not_none(command, "--optimizer", args.optimizer)
+                    append_if_not_none(
+                        command, "--weight_decay", args.weight_decay
+                    )
                     append_if_not_none(
                         command, "--holdout_fraction", args.holdout_fraction
                     )
@@ -100,6 +118,7 @@ def main():
                     append_if_not_none(command, "--mixup_alpha", args.mixup_alpha)
                     append_if_not_none(command, "--sam_rho", args.sam_rho)
                     append_if_not_none(command, "--sagm_gamma", args.sagm_gamma)
+                    append_if_not_none(command, "--eqrm_lr", args.eqrm_lr)
                     if args.no_pretrained:
                         command.append("--no_pretrained")
                     if args.wandb:

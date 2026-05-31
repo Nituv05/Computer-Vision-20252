@@ -103,11 +103,11 @@ python run_experiments.py \
   --methods <method_1> <method_2> ... \
   --backbones <resnet18|resnet50> \
   --seeds <seed_1> <seed_2> ... \
-  --epochs <num_epochs> \
-  --batch_size <batch_size> \
-  --lr <learning_rate> \
+  --steps <num_updates> \
+  --checkpoint_freq <eval_interval> \
   --holdout_fraction <source_val_fraction> \
   --scheduler <none|cosine> \
+  --hparams_profile domainbed \
   --num_workers <num_workers> \
   --save_dir outputs/checkpoints \
   --wandb \
@@ -130,30 +130,40 @@ paper_baselines = ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM
 all = paper_baselines + M2 + M2CL
 ```
 
-Default values used by this project if an option is omitted:
+Default values with `--hparams_profile domainbed`:
 
 ```text
 --methods all
 --backbones resnet18
 --seeds 0 1 2
---epochs 30
---batch_size 128
---lr 0.001
+--steps 5001 for DomainBed-style update-based training
+--checkpoint_freq 300
+--batch_size 32 for most DomainBed baselines, 8 for ARM
+--lr 5e-5
 --holdout_fraction 0.2
 --scheduler none
 --num_workers 4
 --save_dir outputs/checkpoints
 pretrained ImageNet ResNet: enabled
+optimizer: Adam for DomainBed baselines, SGD for M2/M2CL
+weight_decay: 0 for DomainBed baselines, 5e-4 for M2/M2CL
 M2/M2CL alpha: 0.01
 M2/M2CL temperature: 1.0
 M2/M2CL reduction_ratio: 4
 M2/M2CL dropout_p: 0.3
 M2/M2CL embed_dim: 128
 M2/M2CL pipeline_type: parallel
-weight_decay: 5e-4
 mixup_alpha: 0.2
 penalty_weight for CORAL/MMD: 1.0
 ```
+
+Do not pass `--batch_size`, `--lr`, `--weight_decay`, or `--optimizer` if you
+want the DomainBed-style defaults. Passing them explicitly overrides the
+profile.
+
+Use a fresh `--save_dir` when switching from old epoch-based runs to
+step-based runs; otherwise `--skip_existing` may skip metrics from the older
+protocol because filenames are intentionally stable.
 
 Use `--no_pretrained` only for debugging when ImageNet weights cannot be
 downloaded. Do not use `--no_pretrained` for final paper-comparison results.
@@ -175,11 +185,11 @@ python run_experiments.py \
   --methods erm mixup coral rsc sagm m2 m2cl \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 64 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --wandb \
@@ -192,7 +202,7 @@ Wrapper form:
 
 ```bash
 WANDB=1 WANDB_PROJECT=cv20252-m2cl WANDB_TAGS="resnet18 priority" \
-METHODS="erm mixup coral rsc sagm m2 m2cl" BATCH_SIZE=64 bash scripts/run_main.sh
+METHODS="erm mixup coral rsc sagm m2 m2cl" bash scripts/run_main.sh
 ```
 
 If the server has no stable internet during training, use offline mode:
@@ -221,11 +231,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 128 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -240,11 +250,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 128 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -259,11 +269,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 128 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -283,11 +293,11 @@ python run_experiments.py \
   --methods all \
   --backbones resnet50 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 32 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -306,11 +316,11 @@ python run_experiments.py \
   --methods erm rsc mixup coral \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 128 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -337,11 +347,11 @@ python run_experiments.py \
   --methods erm mixup coral rsc sagm m2 m2cl \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 64 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --wandb \
@@ -358,11 +368,11 @@ python run_experiments.py \
   --methods m2cl \
   --backbones resnet18 \
   --seeds 0 1 2 \
-  --epochs 30 \
-  --batch_size 128 \
-  --lr 0.001 \
+  --steps 5001 \
+  --checkpoint_freq 300 \
   --holdout_fraction 0.2 \
   --scheduler none \
+  --hparams_profile domainbed \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
   --skip_existing
@@ -380,8 +390,8 @@ bash scripts/run_main.sh
 Override options like this:
 
 ```bash
-BACKBONE=resnet50 BATCH_SIZE=32 EPOCHS=30 METHODS="m2cl" DATASETS="pacs" bash scripts/run_main.sh
-METHODS="erm rsc mixup coral" DATASETS="pacs vlcs" EPOCHS=30 bash scripts/run_main.sh
+BACKBONE=resnet50 STEPS=5001 CHECKPOINT_FREQ=300 METHODS="m2cl" DATASETS="pacs" bash scripts/run_main.sh
+METHODS="erm rsc mixup coral" DATASETS="pacs vlcs" STEPS=5001 CHECKPOINT_FREQ=300 bash scripts/run_main.sh
 ```
 
 ## 12. Results
