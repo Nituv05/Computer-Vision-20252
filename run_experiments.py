@@ -49,6 +49,14 @@ def main():
     parser.add_argument("--skip_existing", action="store_true")
     parser.add_argument("--dry_run", action="store_true")
     parser.add_argument("--no_pretrained", action="store_true")
+    parser.add_argument("--wandb", action="store_true",
+                        help="Forward W&B logging flags to each train.py run")
+    parser.add_argument("--wandb_project", default="m2cl-domain-generalization")
+    parser.add_argument("--wandb_entity", default=None)
+    parser.add_argument("--wandb_group", default=None)
+    parser.add_argument("--wandb_tags", nargs="*", default=None)
+    parser.add_argument("--wandb_mode", choices=["online", "offline", "disabled"],
+                        default=None)
     args = parser.parse_args()
 
     cfg = load_config(args.dataset)
@@ -94,6 +102,23 @@ def main():
                     append_if_not_none(command, "--sagm_gamma", args.sagm_gamma)
                     if args.no_pretrained:
                         command.append("--no_pretrained")
+                    if args.wandb:
+                        command.append("--wandb")
+                        append_if_not_none(
+                            command, "--wandb_project", args.wandb_project
+                        )
+                        append_if_not_none(
+                            command, "--wandb_entity", args.wandb_entity
+                        )
+                        append_if_not_none(
+                            command, "--wandb_group", args.wandb_group
+                        )
+                        append_if_not_none(
+                            command, "--wandb_mode", args.wandb_mode
+                        )
+                        if args.wandb_tags:
+                            command.append("--wandb_tags")
+                            command.extend(args.wandb_tags)
                     split_name = f"N{split_value}" if split_type == "NICO" else split_value
                     expected_metrics = checkpoint_path(
                         args.save_dir, args.dataset, split_name,

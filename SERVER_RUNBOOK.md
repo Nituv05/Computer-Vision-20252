@@ -110,6 +110,8 @@ python run_experiments.py \
   --scheduler <none|cosine> \
   --num_workers <num_workers> \
   --save_dir outputs/checkpoints \
+  --wandb \
+  --wandb_project <wandb_project_name> \
   --skip_existing
 ```
 
@@ -156,7 +158,56 @@ penalty_weight for CORAL/MMD: 1.0
 Use `--no_pretrained` only for debugging when ImageNet weights cannot be
 downloaded. Do not use `--no_pretrained` for final paper-comparison results.
 
-## 7. Sequential Full Run
+## 7. W&B Logging
+
+Login once on the server:
+
+```bash
+wandb login
+```
+
+Direct `run_experiments.py` form:
+
+```bash
+python run_experiments.py \
+  --dataset pacs \
+  --data_root data_root \
+  --methods erm mixup coral rsc sagm m2 m2cl \
+  --backbones resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --batch_size 64 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
+  --num_workers 4 \
+  --save_dir outputs/checkpoints \
+  --wandb \
+  --wandb_project cv20252-m2cl \
+  --wandb_tags resnet18 priority \
+  --skip_existing
+```
+
+Wrapper form:
+
+```bash
+WANDB=1 WANDB_PROJECT=cv20252-m2cl WANDB_TAGS="resnet18 priority" \
+METHODS="erm mixup coral rsc sagm m2 m2cl" BATCH_SIZE=64 bash scripts/run_main.sh
+```
+
+If the server has no stable internet during training, use offline mode:
+
+```bash
+WANDB=1 WANDB_MODE=offline WANDB_PROJECT=cv20252-m2cl bash scripts/run_main.sh
+```
+
+Then sync later:
+
+```bash
+wandb sync wandb/offline-run-*
+```
+
+## 8. Sequential Full Run
 
 Run in this order. Each command is independent and resumable because
 `--skip_existing` is used.
@@ -218,7 +269,7 @@ python run_experiments.py \
   --skip_existing
 ```
 
-## 8. Optional ResNet-50 Runs
+## 9. Optional ResNet-50 Runs
 
 Run ResNet-50 after ResNet-18. Start with smaller batch size because M2/M2CL
 with ResNet-50 uses much more VRAM.
@@ -244,7 +295,7 @@ python run_experiments.py \
 
 Use the same form for `vlcs` and `office_home` if there is enough GPU time.
 
-## 9. Running Only Selected Baselines
+## 10. Running Only Selected Baselines
 
 Example: run 4 baselines only:
 
@@ -262,6 +313,39 @@ python run_experiments.py \
   --scheduler none \
   --num_workers 4 \
   --save_dir outputs/checkpoints \
+  --skip_existing
+```
+
+Recommended priority set for limited GPU time:
+
+```text
+ERM      standard lower-bound baseline
+Mixup    strong augmentation/domain-mixing baseline
+CORAL    distribution-alignment baseline
+RSC      representation self-challenging baseline
+SAGM     recent/sharpness-aware DG baseline
+M2       proposed architecture without contrastive loss
+M2CL     full proposed method
+```
+
+Command:
+
+```bash
+python run_experiments.py \
+  --dataset pacs \
+  --data_root data_root \
+  --methods erm mixup coral rsc sagm m2 m2cl \
+  --backbones resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --batch_size 64 \
+  --lr 0.001 \
+  --holdout_fraction 0.2 \
+  --scheduler none \
+  --num_workers 4 \
+  --save_dir outputs/checkpoints \
+  --wandb \
+  --wandb_project cv20252-m2cl \
   --skip_existing
 ```
 
@@ -284,7 +368,7 @@ python run_experiments.py \
   --skip_existing
 ```
 
-## 10. Wrapper Script Alternative
+## 11. Wrapper Script Alternative
 
 The wrapper is equivalent to launching the three ResNet-18 dataset commands
 above:
@@ -300,7 +384,7 @@ BACKBONE=resnet50 BATCH_SIZE=32 EPOCHS=30 METHODS="m2cl" DATASETS="pacs" bash sc
 METHODS="erm rsc mixup coral" DATASETS="pacs vlcs" EPOCHS=30 bash scripts/run_main.sh
 ```
 
-## 11. Results
+## 12. Results
 
 Checkpoints and per-run metrics:
 

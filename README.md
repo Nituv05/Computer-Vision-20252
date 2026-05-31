@@ -157,6 +157,13 @@ debugging subset, not as the full paper baseline comparison.
 Use `--dry_run` first to print the exact commands without training. Use
 `--skip_existing` when resuming an interrupted grid.
 
+Optional W&B logging:
+
+```bash
+wandb login
+python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm mixup coral rsc sagm m2 m2cl --backbones resnet18 --seeds 0 1 2 --epochs 30 --batch_size 64 --wandb --wandb_project cv20252-m2cl --skip_existing
+```
+
 ## Evaluate
 
 Evaluate all held-out domains for a dataset:

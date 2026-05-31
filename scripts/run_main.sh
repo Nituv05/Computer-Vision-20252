@@ -11,6 +11,12 @@ METHODS="${METHODS:-all}"
 DATASETS="${DATASETS:-pacs vlcs office_home}"
 EPOCHS="${EPOCHS:-}"
 LR="${LR:-}"
+WANDB="${WANDB:-0}"
+WANDB_PROJECT="${WANDB_PROJECT:-m2cl-domain-generalization}"
+WANDB_ENTITY="${WANDB_ENTITY:-}"
+WANDB_GROUP="${WANDB_GROUP:-}"
+WANDB_MODE="${WANDB_MODE:-}"
+WANDB_TAGS="${WANDB_TAGS:-}"
 
 read -r -a SEED_ARGS <<< "${SEEDS}"
 read -r -a METHOD_ARGS <<< "${METHODS}"
@@ -34,6 +40,25 @@ fi
 if [[ -n "${LR}" ]]; then
   COMMON_ARGS+=(--lr "${LR}")
 fi
+
+case "${WANDB}" in
+  1|true|TRUE|yes|YES)
+    COMMON_ARGS+=(--wandb --wandb_project "${WANDB_PROJECT}")
+    if [[ -n "${WANDB_ENTITY}" ]]; then
+      COMMON_ARGS+=(--wandb_entity "${WANDB_ENTITY}")
+    fi
+    if [[ -n "${WANDB_GROUP}" ]]; then
+      COMMON_ARGS+=(--wandb_group "${WANDB_GROUP}")
+    fi
+    if [[ -n "${WANDB_MODE}" ]]; then
+      COMMON_ARGS+=(--wandb_mode "${WANDB_MODE}")
+    fi
+    if [[ -n "${WANDB_TAGS}" ]]; then
+      read -r -a WANDB_TAG_ARGS <<< "${WANDB_TAGS}"
+      COMMON_ARGS+=(--wandb_tags "${WANDB_TAG_ARGS[@]}")
+    fi
+    ;;
+esac
 
 for dataset in "${DATASET_ARGS[@]}"; do
   echo "Running ${dataset}: methods=${METHODS}, seeds=${SEEDS}, backbone=${BACKBONE}"

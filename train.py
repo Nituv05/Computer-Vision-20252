@@ -250,6 +250,57 @@ def checkpoint_path(save_dir: str, dataset: str, split_name: str,
     return Path(save_dir) / filename
 
 
+def init_wandb(args, cfg: dict, resolved: dict, split_name: str,
+               checkpoint_file: Path):
+    if not args.wandb:
+        return None
+    try:
+        import wandb
+    except ImportError as exc:
+        raise RuntimeError(
+            "W&B logging was requested. Install it with `pip install wandb` "
+            "or run `pip install -r requirements.txt`."
+        ) from exc
+
+    run_name = args.wandb_name or (
+        f"{args.dataset}-{split_name}-{args.method}-"
+        f"{resolved['backbone']}-seed{resolved['seed']}"
+    )
+    run_group = args.wandb_group or (
+        f"{args.dataset}-{args.method}-{resolved['backbone']}"
+    )
+    wandb_config = {
+        **resolved,
+        "dataset": args.dataset,
+        "split_name": split_name,
+        "method": args.method,
+        "tag": args.tag,
+        "num_classes": cfg["num_classes"],
+        "checkpoint": str(checkpoint_file),
+        "source": "train.py",
+    }
+    init_kwargs = {
+        "project": args.wandb_project,
+        "entity": args.wandb_entity,
+        "name": run_name,
+        "group": run_group,
+        "tags": args.wandb_tags,
+        "config": wandb_config,
+    }
+    if args.wandb_mode is not None:
+        init_kwargs["mode"] = args.wandb_mode
+    init_kwargs = {key: value for key, value in init_kwargs.items()
+                   if value is not None}
+    run = wandb.init(**init_kwargs)
+    run.define_metric("epoch")
+    run.define_metric("train/*", step_metric="epoch")
+    run.define_metric("val/*", step_metric="epoch")
+    run.define_metric("test/*", step_metric="epoch")
+    run.define_metric("best/*", step_metric="epoch")
+    run.define_metric("optim/*", step_metric="epoch")
+    return run
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True,
@@ -292,6 +343,15 @@ def main():
     parser.add_argument("--save_dir", default="./outputs/checkpoints")
     parser.add_argument("--tag", default=None,
                         help="Optional variant label for ablations/baselines")
+    parser.add_argument("--wandb", action="store_true",
+                        help="Log train/validation/test metrics to W&B")
+    parser.add_argument("--wandb_project", default="m2cl-domain-generalization")
+    parser.add_argument("--wandb_entity", default=None)
+    parser.add_argument("--wandb_group", default=None)
+    parser.add_argument("--wandb_name", default=None)
+    parser.add_argument("--wandb_tags", nargs="*", default=None)
+    parser.add_argument("--wandb_mode", choices=["online", "offline", "disabled"],
+                        default=None)
     parser.add_argument("--pretrained", dest="pretrained", action="store_true")
     parser.add_argument("--no_pretrained", dest="pretrained", action="store_false")
     parser.set_defaults(pretrained=None)
@@ -399,6 +459,34 @@ def main():
         args.save_dir, args.dataset, split_name, args.method, backbone, seed,
         args.tag,
     )
+    resolved_args = {
+        "seed": seed,
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "lr": lr,
+        "alpha": alpha,
+        "temperature": temperature,
+        "backbone": backbone,
+        "pipeline_type": pipeline_type,
+        "reduction_ratio": reduction_ratio,
+        "dropout_p": dropout_p,
+        "embed_dim": embed_dim,
+        "holdout_fraction": holdout_fraction,
+        "num_workers": num_workers,
+        "pretrained": pretrained,
+        "scheduler": scheduler_name,
+        "weight_decay": args.weight_decay,
+        "mixup_alpha": args.mixup_alpha,
+        "penalty_weight": args.penalty_weight,
+        "sag_w_adv": args.sag_w_adv,
+        "rsc_f_drop_factor": args.rsc_f_drop_factor,
+        "rsc_b_drop_factor": args.rsc_b_drop_factor,
+        "eqrm_quantile": args.eqrm_quantile,
+        "eqrm_burnin_iters": args.eqrm_burnin_iters,
+        "sam_rho": args.sam_rho,
+        "sagm_gamma": args.sagm_gamma,
+    }
+    wandb_run = init_wandb(args, cfg, resolved_args, split_name, ckpt_path)
     best_score = -1.0
     best_epoch = 0
     score_name = "val" if val_loader is not None else "test"
@@ -442,6 +530,18 @@ def main():
                 },
             }, ckpt_path)
 
+        if wandb_run is not None:
+            current_lr = algorithm.optimizers()[0].param_groups[0]["lr"]
+            wandb_run.log({
+                "epoch": epoch,
+                "train/loss": train_loss,
+                "train/acc": train_acc,
+                f"{score_name}/acc": score_acc,
+                "best/score": best_score,
+                "best/epoch": best_epoch,
+                "optim/lr": current_lr,
+            }, step=epoch)
+
     ckpt = torch.load(ckpt_path, map_location=device)
     algorithm.load_state_dict(ckpt["state_dict"])
     test_acc = evaluate(algorithm, test_loader, device)
@@ -466,6 +566,20 @@ def main():
     metrics_path = ckpt_path.with_suffix(".json")
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2)
+
+    if wandb_run is not None:
+        wandb_run.log({
+            "epoch": epochs + 1,
+            "test/acc": test_acc,
+            "best/final_score": best_score,
+            "best/final_epoch": best_epoch,
+        }, step=epochs + 1)
+        wandb_run.summary["test_acc"] = test_acc
+        wandb_run.summary[f"best_{score_name}_acc"] = best_score
+        wandb_run.summary["best_epoch"] = best_epoch
+        wandb_run.summary["checkpoint"] = str(ckpt_path)
+        wandb_run.summary["metrics_json"] = str(metrics_path)
+        wandb_run.finish()
 
     print(f"\nBest epoch: {best_epoch} ({score_name}_acc={best_score:.4f})")
     print(f"Final test accuracy: {test_acc:.4f}")
