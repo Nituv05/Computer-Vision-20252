@@ -40,8 +40,9 @@ def main():
     parser.add_argument("--checkpoint_freq", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
-    parser.add_argument("--hparams_profile", choices=["domainbed", "project"],
-                        default="domainbed")
+    parser.add_argument("--hparams_profile",
+                        choices=["paper", "domainbed", "project"],
+                        default="paper")
     parser.add_argument("--optimizer", choices=["adam", "sgd"], default=None)
     parser.add_argument("--weight_decay", type=float, default=None)
     parser.add_argument("--holdout_fraction", type=float, default=None)

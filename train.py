@@ -365,19 +365,25 @@ def resolve_default_hparams(args, cfg: dict):
     is_m2 = method in {"m2", "m2cl"}
     profile = args.hparams_profile
 
-    if profile == "project":
+    if profile in {"paper", "project"}:
         lr = args.lr if args.lr is not None else cfg["lr"]
         batch_size = (
             args.batch_size if args.batch_size is not None else cfg["batch_size"]
         )
-        weight_decay = (
-            args.weight_decay if args.weight_decay is not None else 5e-4
-        )
-        optimizer = args.optimizer or "sgd"
-        eqrm_burnin_iters = (
-            args.eqrm_burnin_iters
-            if args.eqrm_burnin_iters is not None else 100
-        )
+        if profile == "paper" and not is_m2:
+            lr = args.lr if args.lr is not None else 5e-5
+            if args.batch_size is None:
+                batch_size = 8 if method == "arm" else 32
+            weight_decay_default = 0.0
+            optimizer_default = "adam"
+            eqrm_default = 2500
+        else:
+            weight_decay_default = 5e-4
+            optimizer_default = "sgd"
+            eqrm_default = 100
+        weight_decay = args.weight_decay if args.weight_decay is not None else weight_decay_default
+        optimizer = args.optimizer or optimizer_default
+        eqrm_burnin_iters = args.eqrm_burnin_iters if args.eqrm_burnin_iters is not None else eqrm_default
     else:
         lr = args.lr if args.lr is not None else 5e-5
         if args.batch_size is not None:
@@ -426,9 +432,10 @@ def main():
                         help="Validation/checkpoint interval for --steps")
     parser.add_argument("--batch_size", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
-    parser.add_argument("--hparams_profile", choices=["domainbed", "project"],
-                        default="domainbed",
-                        help="domainbed uses official DomainBed-style defaults")
+    parser.add_argument("--hparams_profile",
+                        choices=["paper", "domainbed", "project"],
+                        default="paper",
+                        help="paper matches the M2-CL paper setup")
     parser.add_argument("--optimizer", choices=["adam", "sgd"], default=None)
     parser.add_argument("--alpha", type=float, default=None)
     parser.add_argument("--temperature", type=float, default=None)
@@ -521,9 +528,13 @@ def main():
     source_envs, target_set, split_name = build_datasets(
         args.dataset, args.data_root, args.test_domain, args.n_heldout, seed
     )
+    use_domainbed_batching = (
+        args.hparams_profile == "domainbed"
+        or (args.hparams_profile == "paper" and args.method not in {"m2", "m2cl"})
+    )
     train_loader, val_loader, test_loader = split_source_environments(
         source_envs, target_set, batch_size, num_workers, holdout_fraction,
-        seed, domainbed_batching=(args.hparams_profile == "domainbed")
+        seed, domainbed_batching=use_domainbed_batching
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -534,6 +545,7 @@ def main():
         f"val={len(val_loader.dataset) if val_loader else 0} "
         f"test={len(test_loader.dataset)} holdout={holdout_fraction} "
         f"profile={args.hparams_profile} "
+        f"domainbed_batching={use_domainbed_batching} "
         f"steps={steps if steps is not None else 'epoch-mode'}"
     )
 
@@ -612,6 +624,7 @@ def main():
         "weight_decay": weight_decay,
         "optimizer": optimizer_name,
         "hparams_profile": args.hparams_profile,
+        "domainbed_batching": use_domainbed_batching,
         "mixup_alpha": args.mixup_alpha,
         "penalty_weight": args.penalty_weight,
         "sag_w_adv": args.sag_w_adv,
@@ -655,10 +668,11 @@ def main():
                 "steps": steps,
                 "checkpoint_freq": checkpoint_freq,
                 "weight_decay": weight_decay,
-                "hparams_profile": args.hparams_profile,
-                "optimizer": optimizer_name,
-            },
-        }, ckpt_path)
+                    "hparams_profile": args.hparams_profile,
+                    "optimizer": optimizer_name,
+                    "domainbed_batching": use_domainbed_batching,
+                },
+            }, ckpt_path)
 
     if steps is None:
         for epoch in range(1, epochs + 1):
@@ -756,6 +770,7 @@ def main():
         "lr": lr,
         "optimizer": optimizer_name,
         "hparams_profile": args.hparams_profile,
+        "domainbed_batching": use_domainbed_batching,
         "batch_size": batch_size,
         "epochs": epochs,
         "steps": steps,
