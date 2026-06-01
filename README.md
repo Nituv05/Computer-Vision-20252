@@ -155,6 +155,31 @@ The same ResNet-18 grid can be launched with:
 bash scripts/run_main.sh
 ```
 
+For the paper protocol, use the explicit backbone scripts. They run PACS,
+VLCS and Office-Home sequentially, use `epochs=30`, `hparams_profile=paper`,
+`holdout_fraction=0.2`, `scheduler=none`, `seeds=0 1 2`, `methods=all`, and
+resume with `--skip_existing`.
+
+```bash
+bash scripts/run_paper_resnet18.sh
+bash scripts/run_paper_resnet50.sh
+```
+
+Enable W&B logging with one project per dataset:
+
+```bash
+WANDB=1 bash scripts/run_paper_resnet18.sh
+WANDB=1 bash scripts/run_paper_resnet50.sh
+```
+
+Useful overrides:
+
+```bash
+DATA_ROOT=/path/to/data_root WANDB=1 bash scripts/run_paper_resnet18.sh
+METHODS="erm mixup coral rsc sagm m2 m2cl" WANDB=1 bash scripts/run_paper_resnet18.sh
+DATASETS="pacs" SEEDS="0" WANDB=1 bash scripts/run_paper_resnet50.sh
+```
+
 `--methods all` runs ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM,
 EQRM, SAGM, M2 and M2-CL. Use `--methods erm m2 m2cl` only as a reduced
 debugging subset, not as the full paper baseline comparison.

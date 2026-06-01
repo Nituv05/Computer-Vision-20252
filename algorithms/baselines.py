@@ -554,6 +554,9 @@ class ResNetAlgorithm(Algorithm):
     def logits_from_features(self, features: torch.Tensor) -> torch.Tensor:
         return self.classifier(features)
 
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.predict(x)
+
     def predict(self, x: torch.Tensor) -> torch.Tensor:
         return self.logits_from_features(self.forward_features(x))
 

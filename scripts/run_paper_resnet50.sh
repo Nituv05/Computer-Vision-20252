@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DATA_ROOT="${DATA_ROOT:-data_root}"
+METHODS="${METHODS:-all}"
+SEEDS="${SEEDS:-0 1 2}"
+DATASETS="${DATASETS:-pacs vlcs office_home}"
+EPOCHS="${EPOCHS:-30}"
+NUM_WORKERS="${NUM_WORKERS:-4}"
+SAVE_DIR="${SAVE_DIR:-outputs/paper30_r50}"
+WANDB="${WANDB:-0}"
+WANDB_PROJECT_PREFIX="${WANDB_PROJECT_PREFIX:-cv20252}"
+WANDB_ENTITY="${WANDB_ENTITY:-}"
+WANDB_MODE="${WANDB_MODE:-}"
+
+read -r -a METHOD_ARGS <<< "${METHODS}"
+read -r -a SEED_ARGS <<< "${SEEDS}"
+read -r -a DATASET_ARGS <<< "${DATASETS}"
+
+project_name() {
+  local dataset="$1"
+  echo "${WANDB_PROJECT_PREFIX}-${dataset//_/-}"
+}
+
+for dataset in "${DATASET_ARGS[@]}"; do
+  dataset_tag="${dataset//_/-}"
+  command=(
+    python run_experiments.py
+    --dataset "${dataset}"
+    --data_root "${DATA_ROOT}"
+    --methods "${METHOD_ARGS[@]}"
+    --backbones resnet50
+    --seeds "${SEED_ARGS[@]}"
+    --epochs "${EPOCHS}"
+    --holdout_fraction 0.2
+    --scheduler none
+    --hparams_profile paper
+    --num_workers "${NUM_WORKERS}"
+    --save_dir "${SAVE_DIR}"
+    --skip_existing
+  )
+
+  case "${WANDB}" in
+    1|true|TRUE|yes|YES)
+      command+=(
+        --wandb
+        --wandb_project "$(project_name "${dataset}")"
+        --wandb_group "${dataset_tag}-resnet50-paper30"
+        --wandb_tags "${dataset}" resnet50 paper30 full
+      )
+      if [[ -n "${WANDB_ENTITY}" ]]; then
+        command+=(--wandb_entity "${WANDB_ENTITY}")
+      fi
+      if [[ -n "${WANDB_MODE}" ]]; then
+        command+=(--wandb_mode "${WANDB_MODE}")
+      fi
+      ;;
+  esac
+
+  echo "Running ${dataset} with ResNet-50, methods=${METHODS}, seeds=${SEEDS}"
+  "${command[@]}"
+done
+
+python summarize_results.py \
+  --metrics_dir "${SAVE_DIR}" \
+  --output_csv "outputs/paper30_r50_results.csv"
+
+echo "Finished ResNet-50 paper runs."
+echo "Checkpoints and metrics: ${SAVE_DIR}"
+echo "Summary CSV: outputs/paper30_r50_results.csv"
