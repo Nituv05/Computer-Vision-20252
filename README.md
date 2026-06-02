@@ -216,6 +216,14 @@ Summarize metric JSON files across seeds/runs:
 python summarize_results.py --metrics_dir outputs/checkpoints --output_csv outputs/results.csv
 ```
 
+Create paper-style tables with best results in bold and second-best results
+underlined:
+
+```bash
+python paper_table.py --metrics_dir outputs/paper30_r18 --backbone resnet18 --output outputs/paper30_r18_table.md
+python paper_table.py --metrics_dir outputs/paper30_r18 --backbone resnet18 --format latex --output outputs/paper30_r18_table.tex
+```
+
 ## Ablations
 
 Architecture/model baselines from the paper's ablation setup:
