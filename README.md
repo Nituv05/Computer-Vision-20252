@@ -267,6 +267,22 @@ python saliency.py --dataset pacs --test_domain photo --data_root /path/to/data_
 
 The script saves side-by-side original/saliency images to `outputs/saliency/`.
 
+For a paper-style comparison grid with input images, ERM baseline saliency and
+M2-CL saliency:
+
+```bash
+python saliency_compare.py \
+  --dataset pacs \
+  --test_domain photo \
+  --data_root /path/to/data_root \
+  --checkpoint_dir outputs/paper30_r18 \
+  --baseline_method erm \
+  --method m2cl \
+  --backbone resnet18 \
+  --seed 0 \
+  --max_images 4
+```
+
 ## Paper Reference Results
 
 Top-1 accuracy from the paper:
