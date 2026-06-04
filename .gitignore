@@ -51,5 +51,5 @@ checkpoints/
 *.docx
 
 # Logs and notebook checkpoints
-*.log
+# *.log
 .ipynb_checkpoints/

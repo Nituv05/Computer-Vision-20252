@@ -7,6 +7,7 @@ SEEDS="${SEEDS:-0 1 2}"
 DATASETS="${DATASETS:-pacs vlcs office_home}"
 EPOCHS="${EPOCHS:-30}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
+BATCH_SIZE="${BATCH_SIZE:-}"
 SAVE_DIR="${SAVE_DIR:-outputs/paper30_r18}"
 WANDB="${WANDB:-0}"
 WANDB_PROJECT_PREFIX="${WANDB_PROJECT_PREFIX:-cv20252}"
@@ -40,6 +41,10 @@ for dataset in "${DATASET_ARGS[@]}"; do
     --skip_existing
   )
 
+  if [[ -n "${BATCH_SIZE}" ]]; then
+    command+=(--batch_size "${BATCH_SIZE}")
+  fi
+
   case "${WANDB}" in
     1|true|TRUE|yes|YES)
       command+=(
@@ -61,9 +66,11 @@ for dataset in "${DATASET_ARGS[@]}"; do
   "${command[@]}"
 done
 
-python summarize_results.py \
-  --metrics_dir "${SAVE_DIR}" \
-  --output_csv "outputs/paper30_r18_results.csv"
+if [[ "${SKIP_SUMMARY:-0}" != "1" ]]; then
+  python summarize_results.py \
+    --metrics_dir "${SAVE_DIR}" \
+    --output_csv "outputs/paper30_r18_results.csv"
+fi
 
 echo "Finished ResNet-18 paper runs."
 echo "Checkpoints and metrics: ${SAVE_DIR}"
