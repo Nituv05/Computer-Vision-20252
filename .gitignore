@@ -26,7 +26,7 @@ Thumbs.db
 # Datasets and generated experiment outputs
 data_root/
 datasets/
-outputs/
+# outputs/
 runs/
 wandb/
 checkpoints/
