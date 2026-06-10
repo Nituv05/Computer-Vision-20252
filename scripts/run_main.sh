@@ -77,10 +77,10 @@ esac
 
 for dataset in "${DATASET_ARGS[@]}"; do
   echo "Running ${dataset}: methods=${METHODS}, seeds=${SEEDS}, backbone=${BACKBONE}"
-  python run_experiments.py --dataset "${dataset}" "${COMMON_ARGS[@]}"
+  python tools/run_experiments.py --dataset "${dataset}" "${COMMON_ARGS[@]}"
 done
 
-python summarize_results.py \
+python tools/summarize_results.py \
   --metrics_dir "${SAVE_DIR}" \
   --output_csv "outputs/main_${BACKBONE}_results.csv"
 

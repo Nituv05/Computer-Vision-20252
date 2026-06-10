@@ -9,7 +9,7 @@ reduction ratios, dropout on/off, and the final M2-CL architecture.
 import torch
 import torch.nn as nn
 
-from architecture_specs import ARCHITECTURE_SPECS, ArchitectureSpec
+from .architecture_specs import ARCHITECTURE_SPECS, ArchitectureSpec
 from .m2cl import ERMResNet, OfficialM2
 
 

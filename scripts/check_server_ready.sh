@@ -29,9 +29,9 @@ if torch.cuda.is_available():
 PY
 
 echo "[2/3] Dataset layout under ${DATA_ROOT}"
-python check_data.py --data_root "${DATA_ROOT}" --dataset pacs
-python check_data.py --data_root "${DATA_ROOT}" --dataset vlcs
-python check_data.py --data_root "${DATA_ROOT}" --dataset office_home
+python tools/check_data.py --data_root "${DATA_ROOT}" --dataset pacs
+python tools/check_data.py --data_root "${DATA_ROOT}" --dataset vlcs
+python tools/check_data.py --data_root "${DATA_ROOT}" --dataset office_home
 
 echo "[3/3] Ready"
 echo "Do not run --dataset all unless ${DATA_ROOT}/nico exists."

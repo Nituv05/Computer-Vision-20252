@@ -24,7 +24,7 @@
     urlcolor=blue
 }
 
-\graphicspath{{../HUST_THEME_BEAMER/photos/}{../HUST_THEME_BEAMER/images/}}
+\graphicspath{{../docs/slides/HUST_THEME_BEAMER/photos/}{../docs/slides/HUST_THEME_BEAMER/images/}}
 
 \newcommand{\method}{\texorpdfstring{$M^2$-CL}{M2-CL}}
 \newcommand{\base}{\texorpdfstring{$M^2$}{M2}}
@@ -273,7 +273,7 @@ File or folder & Role in the project \\
 \codepath{models/extraction\_block.py} & Implements concentration pipelines, spatial dropout, pooling, and MLP projection. \\
 \codepath{losses/contrastive.py} & Implements the layer-wise contrastive regularizer used by \method{}. \\
 \codepath{algorithms/baselines.py} & Wraps M2/M2-CL and baseline algorithms behind a common training interface. \\
-\codepath{train.py} & Builds datasets, splits source domains, trains, validates, checkpoints, and writes metrics. \\
+\codepath{tools/train.py} & Builds datasets, splits source domains, trains, validates, checkpoints, and writes metrics. \\
 \codepath{data/} & Contains dataset loaders for PACS, VLCS, Office-Home, and NICO. \\
 \codepath{configs/} & Stores default hyperparameters for each dataset. \\
 \codepath{scripts/} & Provides shell scripts for full experiment grids and paper-style runs. \\
@@ -338,13 +338,13 @@ The project uses paper-oriented defaults for \base{} and \method{}: ImageNet-pre
 
 \section{Reproduction Workflow}
 
-The repository expects datasets to be placed under a common data root and provides \codepath{check\_data.py} to validate folder layout before long runs. A single PACS run with \method{} can be launched as:
+The repository expects datasets to be placed under a common data root and provides \codepath{tools/check\_data.py} to validate folder layout before long runs. A single PACS run with \method{} can be launched as:
 \[
-    \texttt{\small python train.py --dataset pacs --test\_domain photo --method m2cl}
+    \texttt{\small python tools/train.py --dataset pacs --test\_domain photo --method m2cl}
 \]
 VLCS and Office-Home use the same pattern with different dataset and domain arguments.
 
-For full paper-style experiments, \codepath{run\_experiments.py} and the scripts under \codepath{scripts/} iterate over datasets, target domains, methods, backbones, and seeds. The intended score for each benchmark is the average over held-out target domains and random seeds. The training script saves the checkpoint with the best source validation accuracy, reloads it after training, evaluates the held-out target domain, and writes metric JSON files for later aggregation.
+For full paper-style experiments, \codepath{tools/run\_experiments.py} and the scripts under \codepath{scripts/} iterate over datasets, target domains, methods, backbones, and seeds. The intended score for each benchmark is the average over held-out target domains and random seeds. The training script saves the checkpoint with the best source validation accuracy, reloads it after training, evaluates the held-out target domain, and writes metric JSON files for later aggregation.
 
 \section{Experimental Setup}
 

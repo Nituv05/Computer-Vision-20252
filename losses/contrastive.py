@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def _zero_like(tensor: torch.Tensor) -> torch.Tensor:
+    return tensor.new_tensor(0.0)
+
+
 class LayerContrastiveLoss(nn.Module):
     """
     Official M2-CL layer loss.
@@ -18,28 +22,48 @@ class LayerContrastiveLoss(nn.Module):
             raise ValueError("temperature must be positive")
         self.temperature = temperature
 
+    def _pairwise_energy(self, activations: torch.Tensor) -> torch.Tensor:
+        normalized = F.normalize(activations, dim=1)
+        similarity = torch.matmul(normalized, normalized.t())
+        return torch.exp(similarity)
+
+    def _positive_energy_for_class(
+        self,
+        all_energy: torch.Tensor,
+        labels: torch.Tensor,
+        class_label: torch.Tensor,
+    ) -> torch.Tensor | None:
+        class_indices = torch.nonzero(labels == class_label, as_tuple=False).flatten()
+        if class_indices.numel() < 2:
+            return None
+
+        pair_indices = torch.combinations(class_indices, r=2)
+        positive_energy = all_energy[pair_indices[:, 0], pair_indices[:, 1]].sum()
+        return (positive_energy * 2.0) / self.temperature
+
     def forward(self, activations: torch.Tensor,
                 labels: torch.Tensor) -> torch.Tensor:
+        if activations.size(0) != labels.size(0):
+            raise ValueError("activations and labels must have the same batch size")
         if activations.size(0) < 2:
-            return activations.new_tensor(0.0)
+            return _zero_like(activations)
 
-        normalized = F.normalize(activations, dim=1)
-        all_energy = torch.exp(torch.matmul(normalized, normalized.t()))
+        labels = labels.view(-1)
+        all_energy = self._pairwise_energy(activations)
         denominator = all_energy.sum()
         if denominator <= 0:
-            return activations.new_tensor(0.0)
+            return _zero_like(activations)
 
-        layer_score = activations.new_tensor(0.0)
-        for cls in labels.unique(sorted=True):
-            indices = torch.nonzero(labels == cls, as_tuple=False).flatten()
-            if indices.numel() < 2:
+        layer_score = _zero_like(activations)
+        for class_label in labels.unique(sorted=True):
+            positive_energy = self._positive_energy_for_class(
+                all_energy,
+                labels,
+                class_label,
+            )
+            if positive_energy is None or positive_energy <= 0:
                 continue
-            pairs = torch.combinations(indices, r=2)
-            pos_energy = (
-                all_energy[pairs[:, 0], pairs[:, 1]].sum() * 2.0
-            ) / self.temperature
-            if pos_energy > 0:
-                layer_score = layer_score + torch.log(pos_energy / denominator)
+            layer_score = layer_score + torch.log(positive_energy / denominator)
         return layer_score
 
 
@@ -58,7 +82,7 @@ class MultiLayerContrastiveLoss(nn.Module):
         if self.alpha == 0 or not activations:
             return loss
 
-        custom_score = logits.new_tensor(0.0)
+        custom_score = _zero_like(logits)
         for activation in activations:
             custom_score = custom_score + self.layer_loss(activation, labels)
         return loss - self.alpha * custom_score

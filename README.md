@@ -81,22 +81,22 @@ It tries the DomainBed Google Drive links first, then falls back to public
 mirrors when Drive blocks scripted access:
 
 ```bash
-python download_data.py --data_root /path/to/data_root --datasets pacs vlcs office_home
+python tools/download_data.py --data_root /path/to/data_root --datasets pacs vlcs office_home
 ```
 
 NICO is distributed by the official project site through Dropbox/Baidu. Download
 the archive manually from https://nico.thumedialab.com/, then normalize it:
 
 ```bash
-python download_data.py --data_root /path/to/data_root --datasets nico --nico_archive /path/to/NICO.zip
+python tools/download_data.py --data_root /path/to/data_root --datasets nico --nico_archive /path/to/NICO.zip
 ```
 
 Validate the folder layout before starting long jobs:
 
 ```bash
-python check_data.py --data_root /path/to/data_root --dataset pacs
-python check_data.py --data_root /path/to/data_root --dataset vlcs
-python check_data.py --data_root /path/to/data_root --dataset office_home
+python tools/check_data.py --data_root /path/to/data_root --dataset pacs
+python tools/check_data.py --data_root /path/to/data_root --dataset vlcs
+python tools/check_data.py --data_root /path/to/data_root --dataset office_home
 ```
 
 Use `--dataset all` only after NICO is also present.
@@ -106,37 +106,37 @@ Use `--dataset all` only after NICO is also present.
 PACS leave-one-domain-out:
 
 ```bash
-python train.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl --backbone resnet18
+python tools/train.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl --backbone resnet18
 ```
 
 VLCS and Office-Home:
 
 ```bash
-python train.py --dataset vlcs --test_domain CALTECH --data_root /path/to/data_root --method m2cl
-python train.py --dataset office_home --test_domain Art --data_root /path/to/data_root --method m2cl
+python tools/train.py --dataset vlcs --test_domain CALTECH --data_root /path/to/data_root --method m2cl
+python tools/train.py --dataset office_home --test_domain Art --data_root /path/to/data_root --method m2cl
 ```
 
 NICO leave-multiple-contexts-out:
 
 ```bash
-python train.py --dataset nico --n_heldout 7 --data_root /path/to/data_root --method m2cl
+python tools/train.py --dataset nico --n_heldout 7 --data_root /path/to/data_root --method m2cl
 ```
 
 Useful variants and baselines:
 
 ```bash
-python train.py --dataset pacs --test_domain photo --method erm
-python train.py --dataset pacs --test_domain photo --method rsc
-python train.py --dataset pacs --test_domain photo --method mixup
-python train.py --dataset pacs --test_domain photo --method coral
-python train.py --dataset pacs --test_domain photo --method mmd
-python train.py --dataset pacs --test_domain photo --method sagnet
-python train.py --dataset pacs --test_domain photo --method selfreg
-python train.py --dataset pacs --test_domain photo --method arm
-python train.py --dataset pacs --test_domain photo --method eqrm
-python train.py --dataset pacs --test_domain photo --method sagm
-python train.py --dataset pacs --test_domain photo --method m2 --alpha 0
-python train.py --dataset pacs --test_domain photo --method m2cl --backbone resnet50
+python tools/train.py --dataset pacs --test_domain photo --method erm
+python tools/train.py --dataset pacs --test_domain photo --method rsc
+python tools/train.py --dataset pacs --test_domain photo --method mixup
+python tools/train.py --dataset pacs --test_domain photo --method coral
+python tools/train.py --dataset pacs --test_domain photo --method mmd
+python tools/train.py --dataset pacs --test_domain photo --method sagnet
+python tools/train.py --dataset pacs --test_domain photo --method selfreg
+python tools/train.py --dataset pacs --test_domain photo --method arm
+python tools/train.py --dataset pacs --test_domain photo --method eqrm
+python tools/train.py --dataset pacs --test_domain photo --method sagm
+python tools/train.py --dataset pacs --test_domain photo --method m2 --alpha 0
+python tools/train.py --dataset pacs --test_domain photo --method m2cl --backbone resnet50
 ```
 
 Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
@@ -144,9 +144,9 @@ Checkpoints and metrics JSON are saved under `outputs/checkpoints/` by default.
 Run the full paper-comparison grid over all domains and seeds:
 
 ```bash
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
-python run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
-python run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
+python tools/run_experiments.py --dataset pacs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
+python tools/run_experiments.py --dataset vlcs --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
+python tools/run_experiments.py --dataset office_home --data_root /path/to/data_root --methods all --backbones resnet18 --seeds 0 1 2 --epochs 30 --holdout_fraction 0.2 --scheduler none --hparams_profile paper
 ```
 
 The same ResNet-18 grid can be launched with:
@@ -155,29 +155,29 @@ The same ResNet-18 grid can be launched with:
 bash scripts/run_main.sh
 ```
 
-For the paper protocol, use the explicit backbone scripts. They run PACS,
-VLCS and Office-Home sequentially, use `epochs=30`, `hparams_profile=paper`,
+For the paper protocol, use the paper wrapper. It runs PACS, VLCS and
+Office-Home sequentially, uses `epochs=30`, `hparams_profile=paper`,
 `holdout_fraction=0.2`, `scheduler=none`, `seeds=0 1 2`, `methods=all`, and
-resume with `--skip_existing`.
+resumes with `--skip_existing`.
 
 ```bash
-bash scripts/run_paper_resnet18.sh
-bash scripts/run_paper_resnet50.sh
+bash scripts/run_paper.sh
+BACKBONE=resnet50 bash scripts/run_paper.sh
 ```
 
 Enable W&B logging with one project per dataset:
 
 ```bash
-WANDB=1 bash scripts/run_paper_resnet18.sh
-WANDB=1 bash scripts/run_paper_resnet50.sh
+WANDB=1 bash scripts/run_paper.sh
+BACKBONE=resnet50 WANDB=1 bash scripts/run_paper.sh
 ```
 
 Useful overrides:
 
 ```bash
-DATA_ROOT=/path/to/data_root WANDB=1 bash scripts/run_paper_resnet18.sh
-METHODS="erm mixup coral rsc sagm m2 m2cl" WANDB=1 bash scripts/run_paper_resnet18.sh
-DATASETS="pacs" SEEDS="0" WANDB=1 bash scripts/run_paper_resnet50.sh
+DATA_ROOT=/path/to/data_root WANDB=1 bash scripts/run_paper.sh
+METHODS="erm mixup coral rsc sagm m2 m2cl" WANDB=1 bash scripts/run_paper.sh
+DATASETS="pacs" SEEDS="0" BACKBONE=resnet50 WANDB=1 bash scripts/run_paper.sh
 ```
 
 `--methods all` runs ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM,
@@ -191,7 +191,7 @@ Optional W&B logging:
 
 ```bash
 wandb login
-python run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm mixup coral rsc sagm m2 m2cl --backbones resnet18 --seeds 0 1 2 --epochs 30 --hparams_profile paper --wandb --wandb_project cv20252-m2cl --skip_existing
+python tools/run_experiments.py --dataset pacs --data_root /path/to/data_root --methods erm mixup coral rsc sagm m2 m2cl --backbones resnet18 --seeds 0 1 2 --epochs 30 --hparams_profile paper --wandb --wandb_project cv20252-m2cl --skip_existing
 ```
 
 ## Evaluate
@@ -199,21 +199,21 @@ python run_experiments.py --dataset pacs --data_root /path/to/data_root --method
 Evaluate all held-out domains for a dataset:
 
 ```bash
-python evaluate.py --dataset pacs --data_root /path/to/data_root --method m2cl
-python evaluate.py --dataset vlcs --data_root /path/to/data_root --method m2cl
-python evaluate.py --dataset office_home --data_root /path/to/data_root --method m2cl
+python tools/evaluate.py --dataset pacs --data_root /path/to/data_root --method m2cl
+python tools/evaluate.py --dataset vlcs --data_root /path/to/data_root --method m2cl
+python tools/evaluate.py --dataset office_home --data_root /path/to/data_root --method m2cl
 ```
 
 Evaluate NICO N=3,5,7:
 
 ```bash
-python evaluate.py --dataset nico --data_root /path/to/data_root --method m2cl
+python tools/evaluate.py --dataset nico --data_root /path/to/data_root --method m2cl
 ```
 
 Summarize metric JSON files across seeds/runs:
 
 ```bash
-python summarize_results.py --metrics_dir outputs/checkpoints --output_csv outputs/results.csv
+python tools/summarize_results.py --metrics_dir outputs/checkpoints --output_csv outputs/results.csv
 ```
 
 ## Ablations
@@ -221,13 +221,13 @@ python summarize_results.py --metrics_dir outputs/checkpoints --output_csv outpu
 Architecture/model baselines from the paper's ablation setup:
 
 ```bash
-python architecture_baselines.py --dataset pacs --data_root /path/to/data_root --seeds 0 1 2
-python architecture_baselines.py --dataset vlcs --data_root /path/to/data_root --seeds 0 1 2
+python tools/run_ablations.py --study architecture --dataset pacs --all_domains --data_root /path/to/data_root --seeds 0 1 2
+python tools/run_ablations.py --study architecture --dataset vlcs --all_domains --data_root /path/to/data_root --seeds 0 1 2
 ```
 
 The concrete model classes are implemented in
-`models/architecture_baselines.py`. The root-level `architecture_baselines.py`
-file is only the experiment runner that calls `train.py` for each variant.
+`models/architecture_baselines.py`. The ablation runner in
+`tools/run_ablations.py` calls `tools/train.py` for each variant.
 
 This runs the plain ResNet ERM baseline, M2 cascading/parallel variants with
 different reduction ratios and dropout settings, and the full M2-CL model. Each
@@ -238,14 +238,14 @@ Architecture ablation for pipeline type, reduction ratio, dropout and loss
 on a single target domain:
 
 ```bash
-python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study architecture
+python tools/run_ablations.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study architecture
 ```
 
 Sensitivity studies:
 
 ```bash
-python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study tau
-python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study alpha
+python tools/run_ablations.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study tau
+python tools/run_ablations.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study alpha
 ```
 
 To reproduce the slide/report ablation tables, run the table mode. This expands
@@ -253,7 +253,7 @@ to all domains of PACS and VLCS and supports `--seeds`, `--skip_existing`,
 W&B logging and `--dry_run`:
 
 ```bash
-python ablation.py \
+python tools/run_ablations.py \
   --tables all \
   --datasets pacs vlcs \
   --data_root /path/to/data_root \
@@ -273,15 +273,15 @@ python ablation.py \
 Individual table modes are available:
 
 ```bash
-python ablation.py --tables 5 --datasets pacs vlcs --data_root /path/to/data_root
-python ablation.py --tables 6 --datasets pacs vlcs --data_root /path/to/data_root
-python ablation.py --tables 7 --datasets pacs vlcs --data_root /path/to/data_root
+python tools/run_ablations.py --tables 5 --datasets pacs vlcs --data_root /path/to/data_root
+python tools/run_ablations.py --tables 6 --datasets pacs vlcs --data_root /path/to/data_root
+python tools/run_ablations.py --tables 7 --datasets pacs vlcs --data_root /path/to/data_root
 ```
 
 Use `--dry_run` to print commands without running them. After training, summarize:
 
 ```bash
-python summarize_results.py \
+python tools/summarize_results.py \
   --metrics_dir outputs/ablation_tables \
   --output_csv outputs/ablation_tables/results.csv
 ```
@@ -291,7 +291,7 @@ python summarize_results.py \
 After training a checkpoint:
 
 ```bash
-python saliency.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl
+python tools/saliency.py --dataset pacs --test_domain photo --data_root /path/to/data_root --method m2cl
 ```
 
 The script saves side-by-side original/saliency images to `outputs/saliency/`.
@@ -320,7 +320,7 @@ models/
   extraction_block.py   # official-style M2 concentration pipeline
   m2cl.py               # ERM/M2/M2-CL model builder, ResNet-18/50
   architecture_baselines.py # explicit architecture baseline model classes
-architecture_specs.py   # shared architecture baseline tags and run settings
+  architecture_specs.py # shared architecture baseline tags and run settings
 algorithms/
   baselines.py          # ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM
 losses/
@@ -329,13 +329,19 @@ data/
   pacs.py vlcs.py office_home.py nico.py
 configs/
   pacs.yaml vlcs.yaml office_home.yaml nico.yaml
-download_data.py
-check_data.py
-train.py
-evaluate.py
-run_experiments.py
-architecture_baselines.py
-summarize_results.py
-ablation.py
-saliency.py
+docs/
+  CODE_READING_GUIDE.md
+  SERVER_RUNBOOK.md
+  papers/m2cl_paper.pdf
+  slides/HUST_THEME_BEAMER/
+reportcv/
+  m2cl_report.tex m2cl_report.pdf result_tables.tex result_tables.pdf
+scripts/
+  run_main.sh run_paper.sh run_ablations.sh
+  sync-train.sh smoke_test.sh check_server_ready.sh
+  make_colab_notebooks.py
+tools/
+  train.py evaluate.py run_experiments.py summarize_results.py
+  download_data.py check_data.py saliency.py
+  run_ablations.py
 ```

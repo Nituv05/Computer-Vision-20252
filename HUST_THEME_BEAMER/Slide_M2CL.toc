@@ -1,5 +1,0 @@
-\beamer@sectionintoc {1}{Introduction}{5}{0}{1}
-\beamer@sectionintoc {2}{The $M^2 - CL$ Architecture}{10}{0}{2}
-\beamer@sectionintoc {3}{Experimental}{18}{0}{3}
-\beamer@sectionintoc {4}{Qualitative Visualizations}{31}{0}{4}
-\beamer@sectionintoc {5}{Conclusion}{33}{0}{5}

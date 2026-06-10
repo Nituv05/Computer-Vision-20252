@@ -30,6 +30,7 @@ datasets/
 runs/
 wandb/
 checkpoints/
+server-backup/
 
 # Model checkpoints and exported weights
 *.pth
@@ -50,6 +51,16 @@ checkpoints/
 *.pptx
 *.docx
 
-# Logs and notebook checkpoints
-# *.log
+# Logs, notebooks, and generated build artifacts
+*.log
+*.ipynb
+notebooks/
 .ipynb_checkpoints/
+*.aux
+*.out
+*.toc
+*.nav
+*.snm
+*.fls
+*.fdb_latexmk
+*.synctex.gz
