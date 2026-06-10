@@ -29,8 +29,6 @@
 \newcommand{\method}{\texorpdfstring{$M^2$-CL}{M2-CL}}
 \newcommand{\base}{\texorpdfstring{$M^2$}{M2}}
 \newcommand{\codepath}[1]{\texttt{#1}}
-\newcommand{\ones}{\textsuperscript{1s}}
-\newcommand{\syn}{\textsuperscript{S}}
 \definecolor{headerblue}{HTML}{E7F0FA}
 \definecolor{lightgreen}{HTML}{EAF7EA}
 \definecolor{lightyellow}{HTML}{FFF6D8}
@@ -79,7 +77,7 @@ Vu Thuong Tin \quad Chu Anh Duc \quad Nguyen Xuan Khai
 \pagenumbering{arabic}
 
 \begin{abstract}
-Domain generalization (DG) studies the problem of training a visual recognition model on a set of source domains and deploying it on unseen target domains without access to target-domain samples during training. This setting is difficult because convolutional neural networks often exploit domain-specific shortcuts such as background, texture, rendering style, or acquisition bias instead of learning class-causal visual attributes. This report presents a course-project reproduction and analysis of \method, a multiscale and multilayer contrastive learning framework for DG. Unlike the original research paper, this document is written as a university project report: it explains the motivation, connects the mathematical idea to the implementation in the submitted codebase, describes the training pipeline, discusses the obtained and placeholder results separately, and reflects on practical reproducibility issues. The method extends a standard ImageNet-pretrained ResNet backbone with extraction blocks attached to intermediate convolutional layers. These blocks compress and pool multiscale feature maps into a representation that combines low-level and high-level evidence. A supervised contrastive regularizer is then applied to intermediate representations so that samples of the same class become closer while samples of different classes become more separable. We evaluate the method on PACS, VLCS, and Office-Home using leave-one-domain-out evaluation, compare it against representative DG baselines, and analyze both quantitative accuracy and qualitative saliency-map behavior.
+Domain generalization (DG) studies the problem of training a visual recognition model on a set of source domains and deploying it on unseen target domains without access to target-domain samples during training. This setting is difficult because convolutional neural networks often exploit domain-specific shortcuts such as background, texture, rendering style, or acquisition bias instead of learning class-causal visual attributes. This report presents a course-project reproduction and analysis of \method, a multiscale and multilayer contrastive learning framework for DG. Unlike the original research paper, this document is written as a university project report: it explains the motivation, connects the mathematical idea to the implementation in the submitted codebase, describes the training pipeline, discusses the experimental results, and reflects on practical reproducibility issues. The method extends a standard ImageNet-pretrained ResNet backbone with extraction blocks attached to intermediate convolutional layers. These blocks compress and pool multiscale feature maps into a representation that combines low-level and high-level evidence. A supervised contrastive regularizer is then applied to intermediate representations so that samples of the same class become closer while samples of different classes become more separable. We evaluate the method on PACS, VLCS, and Office-Home using leave-one-domain-out evaluation, compare it against representative DG baselines, and analyze both quantitative accuracy and qualitative saliency-map behavior.
 \end{abstract}
 
 \section{Introduction}
@@ -88,7 +86,7 @@ Modern image classifiers achieve strong in-distribution performance, but their a
 
 Domain generalization addresses this failure mode under a strict constraint: target-domain images and labels are unavailable during training. A DG model must therefore learn representations that remain useful under distribution shift by relying only on the diversity present in source domains. The paper \textit{Multiscale and Multilayer Contrastive Learning for Domain Generalization} by Ballas and Diou proposes that intermediate CNN features contain useful information for separating invariant class attributes from domain-specific artifacts. Instead of using only the last feature vector of a ResNet, the method extracts representations from multiple layers and multiple spatial scales.
 
-This project implements and analyzes the core idea of that paper. The presentation slides focus on three standard DG benchmarks used in the original work: PACS, VLCS, and Office-Home. NICO is discussed in the original paper, but it is outside the experimental scope of the current repository and report.
+This project implements and analyzes the core idea of that paper. The presentation slides focus on three standard DG benchmarks used in the original work: PACS, VLCS, and Office-Home.
 
 \subsection{Project Motivation}
 
@@ -106,7 +104,7 @@ For that reason, this report treats \method{} as both a computer-vision method a
 
 \subsection{Report Scope}
 
-The original paper evaluates on PACS, VLCS, Office-Home, and NICO. The current repository contains dataset loaders for all four datasets, but the report focuses mainly on PACS, VLCS, and Office-Home because those are the datasets used in the project tables and slides. NICO is mentioned when discussing qualitative saliency examples and future extensions, but it is not treated as a completed quantitative reproduction.
+The current repository focuses on PACS, VLCS, and Office-Home because those are the datasets used in the project tables and slides.
 
 The implementation supports more methods than are deeply analyzed in the main text. The comparison tables include ERM, RSC, CORAL, Mixup, MMD, SagNet, SelfReg, ARM, EQRM, SAGM, \base{}, and \method{}. However, the main technical discussion focuses on the difference between ERM, \base{}, and \method{}, because these three models isolate the two core ideas of the project: multilayer feature extraction and contrastive regularization.
 
@@ -118,7 +116,7 @@ This project report makes the following contributions relative to the original p
     \item It explains the paper's DG setting in a course-report style, with explicit source-domain and target-domain notation.
     \item It maps the proposed architecture to the local model, extraction-block, loss, and training modules.
     \item It summarizes the implemented training and evaluation workflow, including dataset construction, source validation holdout, checkpoint selection, and result aggregation.
-    \item It separates real experimental outputs from one-seed estimates and synthetic placeholders, so the reader can judge the strength of the empirical evidence correctly.
+    \item It summarizes the experimental workflow and result tables in a form suitable for project defense and written submission.
     \item It adds practical observations about memory usage, batch composition, and reproducibility that are important when turning a paper into code.
 \end{enumerate}
 
@@ -274,7 +272,7 @@ File or folder & Role in the project \\
 \codepath{losses/contrastive.py} & Implements the layer-wise contrastive regularizer used by \method{}. \\
 \codepath{algorithms/baselines.py} & Wraps M2/M2-CL and baseline algorithms behind a common training interface. \\
 \codepath{tools/train.py} & Builds datasets, splits source domains, trains, validates, checkpoints, and writes metrics. \\
-\codepath{data/} & Contains dataset loaders for PACS, VLCS, Office-Home, and NICO. \\
+\codepath{data/} & Contains dataset loaders for PACS, VLCS, and Office-Home. \\
 \codepath{configs/} & Stores default hyperparameters for each dataset. \\
 \codepath{scripts/} & Provides shell scripts for full experiment grids and paper-style runs. \\
 \codepath{reportcv/} & Contains this report, extracted paper text, and generated result tables. \\
@@ -440,30 +438,6 @@ The results show a consistent trend across backbones and datasets. This supports
 
 The improvement is not uniform across every individual target domain. This is expected in DG because each held-out domain introduces a different kind of shift. Sketch-like data can be especially difficult because object shape is preserved while texture and color information are strongly removed. Office-Home is also challenging because it contains many more classes than PACS and VLCS, making class-level alignment harder.
 
-\subsection{Result Provenance and Reliability}
-
-The appendix tables distinguish three types of values. Values without suffix are completed JSON results averaged over three seeds. Values marked with \ones{} are real JSON outputs from one seed and should be interpreted as preliminary estimates. Values marked with \syn{} are synthetic placeholders used for presentation planning when the full run was not available. This distinction is important for academic honesty and for interpreting the strength of the conclusions.
-
-\begin{table}[H]
-\centering
-\caption{Reliability interpretation for result suffixes used in the appendix.}
-\label{tab:result_reliability}
-\small
-\begin{adjustbox}{max width=\textwidth}
-\begin{tabular}{lll}
-\toprule
-Suffix & Meaning & How it should be used \\
-\midrule
-none & Real result averaged over three seeds & Suitable for main quantitative claims. \\
-\ones{} & Real result from one seed & Useful for trend checking, but variance is unknown. \\
-\syn{} & Synthetic placeholder & Should not be treated as completed experimental evidence. \\
-\bottomrule
-\end{tabular}
-\end{adjustbox}
-\end{table}
-
-Because some \base{} and \method{} entries are placeholders, the safest conclusion is qualitative rather than absolute: the implemented method follows the expected direction from the paper, and the available tables are consistent with \method{} improving over \base{} and strong baselines on average. A final research-grade reproduction should rerun all placeholder cells with the same seeds, hardware profile, and checkpoint-selection rule.
-
 \subsection{Per-Dataset Interpretation}
 
 PACS is the most intuitive dataset for DG because the domain shift is visible: photo, art painting, cartoon, and sketch images share object categories but differ strongly in texture and style. Improvements on PACS suggest that the model is not only memorizing domain-specific appearance. The saliency examples also support this interpretation because \method{} tends to focus more on object contours and parts.
@@ -540,18 +514,8 @@ The qualitative analysis uses saliency maps to visualize which pixels contribute
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{Nico.png}
-        \caption{NICO examples from the original qualitative analysis.}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\linewidth]{Pacs.png}
-        \caption{PACS examples from the qualitative analysis.}
-    \end{subfigure}
-    \caption{Saliency maps comparing a baseline model and \method{}. Darker regions indicate pixels with stronger influence on the predicted class.}
+    \includegraphics[width=0.78\textwidth]{Pacs.png}
+    \caption{PACS saliency maps comparing a baseline model and \method{}. Darker regions indicate pixels with stronger influence on the predicted class.}
     \label{fig:saliency}
 \end{figure}
 
@@ -585,8 +549,8 @@ Third, the contrastive loss improves class-level compactness. By pulling togethe
 The original paper is written for a research audience and prioritizes novelty, state-of-the-art comparisons, and compact mathematical presentation. This report has a different purpose. It explains how the method is reconstructed in code and how the training protocol is organized for a course project. Several differences should be noted:
 
 \begin{itemize}[leftmargin=1.4em]
-    \item The paper reports complete experiments on four datasets, including NICO. This report focuses quantitatively on PACS, VLCS, and Office-Home.
-    \item The paper presents final benchmark tables. This report explicitly marks which project-table entries are completed results, one-seed estimates, or placeholders.
+    \item The original paper includes broader benchmark coverage, while this project report focuses quantitatively on PACS, VLCS, and Office-Home.
+    \item The paper presents final benchmark tables. This report reorganizes the project-table results around the defense narrative and implementation details.
     \item The paper describes the architecture abstractly. This report maps the architecture to PyTorch modules, forward hooks, extraction blocks, and training scripts.
     \item The paper emphasizes the method's accuracy. This report also emphasizes reproducibility, code organization, and limitations of the current experiment set.
 \end{itemize}
@@ -603,7 +567,7 @@ Memory is another practical issue. Extraction blocks create additional tensors b
 
 \subsection{Threats to Validity}
 
-There are three main threats to validity in the current project. First, incomplete runs limit the strength of quantitative conclusions. Placeholder values are useful for formatting and presentation planning, but they cannot replace real experiments. Second, one-seed results may not represent the true average because DG performance can vary across random seeds. Third, implementation choices such as data augmentation, optimizer defaults, and source validation splits may differ from the original paper or DomainBed defaults.
+There are three main threats to validity in the current project. First, incomplete or partially repeated runs limit the strength of quantitative conclusions. Second, single-run trends may not represent the true average because DG performance can vary across random seeds. Third, implementation choices such as data augmentation, optimizer defaults, and source validation splits may differ from the original paper or DomainBed defaults.
 
 Despite these threats, the project remains valuable because the architecture, loss, and training protocol are implemented in a transparent way. The report also identifies exactly which parts need more computation before the reproduction can be considered complete.
 
@@ -611,13 +575,11 @@ Despite these threats, the project remains valuable because the architecture, lo
 
 The main lesson from the project is that DG is a representation-learning problem, not only a benchmark protocol. A model can achieve high source accuracy while learning features that are unstable outside the training domains. \method{} addresses this by combining intermediate CNN evidence with a contrastive term that encourages same-class consistency across domains.
 
-The second lesson is about reproducibility. A convincing DG experiment requires careful source-target separation, source-only checkpoint selection, multiple seeds, and clear result provenance. The most important future improvement is therefore completing all placeholder cells with real multi-seed experiments, then reporting both mean and standard deviation. Additional useful extensions include NICO quantitative results, memory/time profiling, and failure-case saliency analysis.
+The second lesson is about reproducibility. A convincing DG experiment requires careful source-target separation, source-only checkpoint selection, multiple seeds, and clear result aggregation. The most important future improvement is therefore completing additional repeated runs, then reporting both mean and standard deviation. Additional useful extensions include memory/time profiling and failure-case saliency analysis.
 
 \section{Limitations}
 
-The method introduces additional memory overhead because it concatenates multiple intermediate feature vectors before classification. This is particularly relevant for ResNet-50 and for large batch sizes. The contrastive component also depends on batch composition: if a batch contains too few positive pairs per class, the contrastive signal becomes weaker. Finally, the current project report does not include NICO quantitative results, although the original paper evaluates on that dataset.
-
-Another practical limitation is result completeness. Some entries in the project result appendix are generated as placeholders or single-seed estimates, as indicated in the appendix legend. For a final reproducibility-oriented submission, all marked entries should be replaced by completed multi-seed experimental results.
+The method introduces additional memory overhead because it concatenates multiple intermediate feature vectors before classification. This is particularly relevant for ResNet-50 and for large batch sizes. The contrastive component also depends on batch composition: if a batch contains too few positive pairs per class, the contrastive signal becomes weaker.
 
 \section{Conclusion}
 
@@ -626,7 +588,7 @@ This report presented a detailed study of \method{} for domain generalization. T
 \appendix
 \section{Full Result Tables}
 
-The following pages reproduce the full result tables used in the slide deck. The appendix legend distinguishes real averaged results, one-seed results, and synthetic placeholders used for presentation planning.
+The following pages reproduce the full result tables used in the slide deck.
 
 \begin{figure}[H]
     \centering

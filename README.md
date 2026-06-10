@@ -67,8 +67,6 @@ data_root/
     Clipart/<class>/*.jpg
     Product/<class>/*.jpg
     RealWorld/<class>/*.jpg
-  nico/
-    <class>/<context>/*.jpg
 ```
 
 `office_home/RealWorld` also accepts common aliases such as `Real_World`,
@@ -84,22 +82,14 @@ mirrors when Drive blocks scripted access:
 python tools/download_data.py --data_root /path/to/data_root --datasets pacs vlcs office_home
 ```
 
-NICO is distributed by the official project site through Dropbox/Baidu. Download
-the archive manually from https://nico.thumedialab.com/, then normalize it:
-
-```bash
-python tools/download_data.py --data_root /path/to/data_root --datasets nico --nico_archive /path/to/NICO.zip
-```
-
 Validate the folder layout before starting long jobs:
 
 ```bash
 python tools/check_data.py --data_root /path/to/data_root --dataset pacs
 python tools/check_data.py --data_root /path/to/data_root --dataset vlcs
 python tools/check_data.py --data_root /path/to/data_root --dataset office_home
+python tools/check_data.py --data_root /path/to/data_root --dataset all
 ```
-
-Use `--dataset all` only after NICO is also present.
 
 ## Train
 
@@ -114,12 +104,6 @@ VLCS and Office-Home:
 ```bash
 python tools/train.py --dataset vlcs --test_domain CALTECH --data_root /path/to/data_root --method m2cl
 python tools/train.py --dataset office_home --test_domain Art --data_root /path/to/data_root --method m2cl
-```
-
-NICO leave-multiple-contexts-out:
-
-```bash
-python tools/train.py --dataset nico --n_heldout 7 --data_root /path/to/data_root --method m2cl
 ```
 
 Useful variants and baselines:
@@ -202,12 +186,6 @@ Evaluate all held-out domains for a dataset:
 python tools/evaluate.py --dataset pacs --data_root /path/to/data_root --method m2cl
 python tools/evaluate.py --dataset vlcs --data_root /path/to/data_root --method m2cl
 python tools/evaluate.py --dataset office_home --data_root /path/to/data_root --method m2cl
-```
-
-Evaluate NICO N=3,5,7:
-
-```bash
-python tools/evaluate.py --dataset nico --data_root /path/to/data_root --method m2cl
 ```
 
 Summarize metric JSON files across seeds/runs:
@@ -305,9 +283,6 @@ Top-1 accuracy from the paper:
 | PACS avg | 83.54 | 85.97 |
 | VLCS avg | 77.78 | 78.36 |
 | Office-Home avg | 63.27 | 71.07 |
-| NICO N=3 | 87.93 | 89.30 |
-| NICO N=5 | 84.10 | 87.68 |
-| NICO N=7 | 82.14 | 86.90 |
 
 The paper compares against DomainBed baselines ERM, RSC, Mixup, CORAL, MMD,
 SagNet, SelfReg, ARM, EQRM and SAGM. This project repo implements all ten
@@ -326,9 +301,9 @@ algorithms/
 losses/
   contrastive.py        # layer-wise M2-CL contrastive objective
 data/
-  pacs.py vlcs.py office_home.py nico.py
+  pacs.py vlcs.py office_home.py
 configs/
-  pacs.yaml vlcs.yaml office_home.yaml nico.yaml
+  pacs.yaml vlcs.yaml office_home.yaml
 docs/
   CODE_READING_GUIDE.md
   SERVER_RUNBOOK.md

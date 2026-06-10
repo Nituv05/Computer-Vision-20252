@@ -112,32 +112,10 @@ def check_office_home(data_root: Path):
     return all_ok
 
 
-def check_nico(data_root: Path):
-    nico_root = data_root / "nico"
-    print(f"\n[NICO] root={nico_root}")
-    if not nico_root.exists():
-        print("  MISSING dataset root")
-        return False
-
-    class_dirs = sorted(path for path in nico_root.iterdir() if path.is_dir())
-    all_ok = bool(class_dirs)
-    for cls_dir in class_dirs:
-        contexts = sorted(path for path in cls_dir.iterdir() if path.is_dir())
-        image_count = count_images(cls_dir)
-        ok = len(contexts) > 7 and image_count > 0
-        all_ok = all_ok and ok
-        print(
-            f"  {cls_dir.name:20s} {status(ok):8s} "
-            f"contexts={len(contexts):3d} images={image_count:6d}"
-        )
-    return all_ok
-
-
 CHECKERS = {
     "pacs": check_pacs,
     "vlcs": check_vlcs,
     "office_home": check_office_home,
-    "nico": check_nico,
 }
 
 

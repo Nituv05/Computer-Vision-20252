@@ -47,7 +47,7 @@ def load_config(dataset: str) -> dict:
                 for item in value.strip("[]").split(",")
                 if item.strip()
             ]
-    if dataset != "nico" and "domains" not in cfg:
+    if "domains" not in cfg:
         raise ValueError(f"Missing domains in {cfg_path}")
     return cfg
 
@@ -88,10 +88,6 @@ def selected_studies(args) -> list[str]:
 
 
 def split_values(dataset: str, cfg: dict, args, table_mode: bool):
-    if dataset == "nico":
-        if table_mode or args.all_domains:
-            return [("NICO", str(value)) for value in args.nico_values]
-        return [("NICO", str(args.n_heldout))]
     if table_mode or args.all_domains:
         return [("DOMAIN", domain) for domain in cfg["domains"]]
     return [("DOMAIN", args.test_domain)]
@@ -146,12 +142,8 @@ def base_command(args, dataset: str, split_type: str, split_value: str,
         "--seed", str(seed),
         "--save_dir", args.save_dir,
     ]
-    if split_type == "NICO":
-        split_name = f"N{split_value}"
-        command.extend(["--n_heldout", split_value])
-    else:
-        split_name = split_value
-        command.extend(["--test_domain", split_value])
+    split_name = split_value
+    command.extend(["--test_domain", split_value])
     add_common_train_flags(command, args)
     return command, split_name
 
@@ -247,17 +239,15 @@ def planned_commands(args):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="pacs",
-                        choices=["pacs", "vlcs", "office_home", "nico"])
+                        choices=["pacs", "vlcs", "office_home"])
     parser.add_argument("--datasets", nargs="+",
-                        choices=["pacs", "vlcs", "office_home", "nico"],
+                        choices=["pacs", "vlcs", "office_home"],
                         default=None,
                         help="Table mode: run the selected study on all splits "
                              "of each listed dataset.")
     parser.add_argument("--test_domain", default="photo")
     parser.add_argument("--all_domains", action="store_true",
-                        help="Run all domains/held-out values for --dataset.")
-    parser.add_argument("--n_heldout", type=int, default=7)
-    parser.add_argument("--nico_values", nargs="+", type=int, default=[3, 5, 7])
+                        help="Run all domains for --dataset.")
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--backbone", choices=["resnet18", "resnet50"],
                         default="resnet18")

@@ -13,9 +13,7 @@ from algorithms import BASELINE_METHODS, METHODS
 from tools.train import checkpoint_path, load_config
 
 
-def dataset_splits(dataset, cfg, nico_values):
-    if dataset == "nico":
-        return [("NICO", str(n)) for n in nico_values]
+def dataset_splits(dataset, cfg):
     return [("DOMAIN", domain) for domain in cfg["domains"]]
 
 
@@ -27,7 +25,7 @@ def append_if_not_none(command, flag, value):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True,
-                        choices=["pacs", "vlcs", "office_home", "nico"])
+                        choices=["pacs", "vlcs", "office_home"])
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--methods", nargs="+",
                         choices=[*METHODS, "paper_baselines", "all"],
@@ -35,7 +33,6 @@ def main():
     parser.add_argument("--backbones", nargs="+", choices=["resnet18", "resnet50"],
                         default=["resnet18"])
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
-    parser.add_argument("--nico_values", nargs="+", type=int, default=[3, 5, 7])
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--checkpoint_freq", type=int, default=None)
@@ -79,9 +76,7 @@ def main():
     for method in methods:
         for backbone in args.backbones:
             for seed in args.seeds:
-                for split_type, split_value in dataset_splits(
-                    args.dataset, cfg, args.nico_values
-                ):
+                for split_type, split_value in dataset_splits(args.dataset, cfg):
                     command = [
                         sys.executable,
                         "tools/train.py",
@@ -92,10 +87,7 @@ def main():
                         "--seed", str(seed),
                         "--save_dir", args.save_dir,
                     ]
-                    if split_type == "NICO":
-                        command.extend(["--n_heldout", split_value])
-                    else:
-                        command.extend(["--test_domain", split_value])
+                    command.extend(["--test_domain", split_value])
 
                     append_if_not_none(command, "--epochs", args.epochs)
                     append_if_not_none(command, "--steps", args.steps)
@@ -140,7 +132,7 @@ def main():
                         if args.wandb_tags:
                             command.append("--wandb_tags")
                             command.extend(args.wandb_tags)
-                    split_name = f"N{split_value}" if split_type == "NICO" else split_value
+                    split_name = split_value
                     expected_metrics = checkpoint_path(
                         args.save_dir, args.dataset, split_name,
                         method, backbone, seed

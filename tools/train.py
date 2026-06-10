@@ -3,7 +3,6 @@ Train paper baselines, M2 or M2-CL on a domain generalization split.
 
 Examples:
   python tools/train.py --dataset pacs --test_domain photo --method m2cl
-  python tools/train.py --dataset nico --n_heldout 7 --method m2cl
 """
 import argparse
 import hashlib
@@ -236,7 +235,7 @@ def load_config(dataset: str):
 
 
 def build_datasets(dataset: str, data_root: str, test_domain: str | None,
-                   n_heldout: int | None, seed: int):
+                   seed: int):
     if dataset == "pacs":
         from data.pacs import DOMAINS, PACSDataset
         if test_domain is None:
@@ -267,16 +266,6 @@ def build_datasets(dataset: str, data_root: str, test_domain: str | None,
         ]
         target_dataset = OfficeHomeDataset(data_root, test_domain, "test")
         split_name = test_domain
-    elif dataset == "nico":
-        from data.nico import NICODataset, build_context_split
-        if n_heldout is None:
-            raise ValueError("--n_heldout is required for NICO")
-        train_contexts, test_contexts = build_context_split(
-            data_root, n_heldout, seed
-        )
-        source_envs = [NICODataset(data_root, train_contexts, "train")]
-        target_dataset = NICODataset(data_root, test_contexts, "test")
-        split_name = f"N{n_heldout}"
     else:
         raise ValueError(f"Unknown dataset: {dataset}")
 
@@ -284,10 +273,9 @@ def build_datasets(dataset: str, data_root: str, test_domain: str | None,
 
 
 def build_raw_loaders(dataset: str, data_root: str, test_domain: str | None,
-                      n_heldout: int | None, batch_size: int,
-                      num_workers: int, seed: int):
+                      batch_size: int, num_workers: int, seed: int):
     source_envs, target_dataset, split_name = build_datasets(
-        dataset, data_root, test_domain, n_heldout, seed
+        dataset, data_root, test_domain, seed
     )
     train_dataset = _concat(source_envs)
     return train_dataset, target_dataset, split_name
@@ -415,10 +403,8 @@ def resolve_default_hparams(args, cfg: dict):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True,
-                        choices=["pacs", "vlcs", "office_home", "nico"])
+                        choices=["pacs", "vlcs", "office_home"])
     parser.add_argument("--test_domain", default=None)
-    parser.add_argument("--n_heldout", type=int, default=None,
-                        help="NICO held-out contexts per class: 3, 5 or 7")
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--method", choices=METHODS, default="m2cl")
     parser.add_argument("--backbone", choices=["resnet18", "resnet50"], default=None)
@@ -525,7 +511,7 @@ def main():
         alpha = 0.0
 
     source_envs, target_set, split_name = build_datasets(
-        args.dataset, args.data_root, args.test_domain, args.n_heldout, seed
+        args.dataset, args.data_root, args.test_domain, seed
     )
     use_domainbed_batching = (
         args.hparams_profile == "domainbed"

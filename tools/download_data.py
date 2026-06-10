@@ -76,17 +76,7 @@ PACS_LABELS = [
 ]
 
 
-CHECKABLE_DATASETS = ["pacs", "vlcs", "office_home", "nico"]
-
-
-NICO_HINT = """
-NICO is distributed by the official project site through Dropbox/Baidu.
-Download it manually from:
-  https://nico.thumedialab.com/
-
-Then run:
-  python tools/download_data.py --data_root <root> --datasets nico --nico_archive <path-to-nico-archive>
-"""
+CHECKABLE_DATASETS = ["pacs", "vlcs", "office_home"]
 
 
 def remove_path(path: Path):
@@ -339,52 +329,12 @@ def download_domainbed_dataset(name: str, data_root: Path, force: bool,
     print(f"[OK] {name}: {target}")
 
 
-def normalize_nico(data_root: Path, archive_path: Path | None, force: bool,
-                   keep_archive: bool):
-    target = data_root / "nico"
-    if target.exists() and not force:
-        print(f"[SKIP] nico: {target} exists")
-        return
-    if archive_path is None:
-        print(NICO_HINT.strip())
-        return
-    if target.exists() and force:
-        remove_path(target)
-
-    archive_path = archive_path.resolve()
-    print(f"[EXTRACT] {archive_path}")
-    extract_archive(archive_path, data_root)
-
-    candidates = [
-        "nico", "NICO", "NICO_DG", "NICO-dataset", "NICO_Dataset",
-        "NICO-master",
-    ]
-    for candidate in candidates:
-        src = data_root / candidate
-        if src.exists():
-            if src != target:
-                src.rename(target)
-            break
-    else:
-        print(
-            "NICO archive extracted, but I could not infer the top folder. "
-            "Rename the extracted class/context folder to 'nico'."
-        )
-        return
-
-    if not keep_archive and archive_path.parent == data_root:
-        archive_path.unlink(missing_ok=True)
-    print(f"[OK] nico: {target}")
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", required=True)
     parser.add_argument("--datasets", nargs="+",
-                        choices=["pacs", "vlcs", "office_home", "nico", "all"],
+                        choices=["pacs", "vlcs", "office_home", "all"],
                         default=["pacs", "vlcs", "office_home"])
-    parser.add_argument("--nico_archive", default=None,
-                        help="Path to a manually downloaded NICO archive")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--keep_archive", action="store_true")
     args = parser.parse_args()
@@ -394,19 +344,12 @@ def main():
 
     datasets = args.datasets
     if "all" in datasets:
-        datasets = ["pacs", "vlcs", "office_home", "nico"]
+        datasets = ["pacs", "vlcs", "office_home"]
 
     for dataset in datasets:
         if dataset in DOMAINBED_URLS:
             download_domainbed_dataset(
                 dataset, data_root, args.force, args.keep_archive
-            )
-        elif dataset == "nico":
-            normalize_nico(
-                data_root,
-                Path(args.nico_archive) if args.nico_archive else None,
-                args.force,
-                args.keep_archive,
             )
 
     print("\nRun this after downloads finish:")

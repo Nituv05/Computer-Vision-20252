@@ -51,9 +51,6 @@ data_root/
   office_home/
 ```
 
-NICO is optional and is not required for the current run. Do not run
-`--dataset all` unless `data_root/nico/` exists.
-
 If data is elsewhere, replace `data_root` in commands with that path.
 
 ## 4. Check Server And Data
