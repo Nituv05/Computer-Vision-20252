@@ -46,7 +46,7 @@ checkpoints/
 *.7z
 
 # Local papers, slides and report exports
-*.pdf
+# *.pdf
 *.pptx
 *.docx
 
