@@ -64,6 +64,24 @@ class M2CascadingR6NoDropout(M2ArchitectureBaseline):
     dropout_p = 0.0
 
 
+class M2CascadingR2Dropout(M2ArchitectureBaseline):
+    pipeline_type = "cascading"
+    reduction_ratio = 2
+    dropout_p = 0.3
+
+
+class M2CascadingR4Dropout(M2ArchitectureBaseline):
+    pipeline_type = "cascading"
+    reduction_ratio = 4
+    dropout_p = 0.3
+
+
+class M2CascadingR6Dropout(M2ArchitectureBaseline):
+    pipeline_type = "cascading"
+    reduction_ratio = 6
+    dropout_p = 0.3
+
+
 class M2ParallelR2NoDropout(M2ArchitectureBaseline):
     pipeline_type = "parallel"
     reduction_ratio = 2
@@ -122,6 +140,9 @@ ARCHITECTURE_CLASSES = {
     "m2_cascading_r2_no_dropout": M2CascadingR2NoDropout,
     "m2_cascading_r4_no_dropout": M2CascadingR4NoDropout,
     "m2_cascading_r6_no_dropout": M2CascadingR6NoDropout,
+    "m2_cascading_r2_dropout": M2CascadingR2Dropout,
+    "m2_cascading_r4_dropout": M2CascadingR4Dropout,
+    "m2_cascading_r6_dropout": M2CascadingR6Dropout,
     "m2_parallel_r2_no_dropout": M2ParallelR2NoDropout,
     "m2_parallel_r4_no_dropout": M2ParallelR4NoDropout,
     "m2_parallel_r6_no_dropout": M2ParallelR6NoDropout,

@@ -1,0 +1,297 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+\graphicspath{{../HUST_THEME_BEAMER/photos/}{../HUST_THEME_BEAMER/images/}}
+
+\newcommand{\method}{\texorpdfstring{$M^2$-CL}{M2-CL}}
+\newcommand{\base}{\texorpdfstring{$M^2$}{M2}}
+
+\title{\textbf{Multiscale and Multilayer Contrastive Learning for Domain Generalization}\\
+\large Course Project Report}
+\author{
+Group 26\\
+Vu Thuong Tin \quad Chu Anh Duc \quad Nguyen Xuan Khai
+}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Domain generalization (DG) studies the problem of training a visual recognition model on a set of source domains and deploying it on unseen target domains without access to target-domain samples during training. This setting is difficult because convolutional neural networks often exploit domain-specific shortcuts such as background, texture, rendering style, or acquisition bias instead of learning class-causal visual attributes. This report presents a course-project reproduction and analysis of \method, a multiscale and multilayer contrastive learning framework for DG. The method extends a standard ImageNet-pretrained ResNet backbone with extraction blocks attached to intermediate convolutional layers. These blocks compress and pool multiscale feature maps into a representation that combines low-level and high-level evidence. A supervised contrastive regularizer is then applied to intermediate representations so that samples of the same class become closer while samples of different classes become more separable. We evaluate the method on PACS, VLCS, and Office-Home using leave-one-domain-out evaluation, compare it against representative DG baselines, and analyze both quantitative accuracy and qualitative saliency-map behavior. The results indicate that the multiscale architecture and contrastive loss improve average target-domain accuracy and reduce reliance on spurious background cues.
+\end{abstract}
+
+\section{Introduction}
+
+Modern image classifiers achieve strong in-distribution performance, but their accuracy can drop sharply when the test images come from a visual context that was absent during training. This is common in practical applications: a model trained on photos may be evaluated on sketches, artworks, cartoons, medical images from another device, or objects captured in a different environment. The central problem is that empirical risk minimization (ERM) does not distinguish between class-causal evidence and domain-specific shortcuts. If a training domain repeatedly associates a class with a background, texture, or color distribution, a high-capacity CNN can learn that correlation and still achieve low source-domain error.
+
+Domain generalization addresses this failure mode under a strict constraint: target-domain images and labels are unavailable during training. A DG model must therefore learn representations that remain useful under distribution shift by relying only on the diversity present in source domains. The paper \textit{Multiscale and Multilayer Contrastive Learning for Domain Generalization} by Ballas and Diou proposes that intermediate CNN features contain useful information for separating invariant class attributes from domain-specific artifacts. Instead of using only the last feature vector of a ResNet, the method extracts representations from multiple layers and multiple spatial scales.
+
+This project implements and analyzes the core idea of that paper. The presentation slides focus on three standard DG benchmarks used in the original work: PACS, VLCS, and Office-Home. NICO is discussed in the original paper, but it is outside the experimental scope of the current repository and report.
+
+\section{Problem Formulation}
+
+Let $\mathcal{D} = \{D_1, D_2, \ldots, D_N\}$ be a set of source domains. Each domain contains image-label pairs $(x,y)$ sampled from a domain-specific joint distribution over $\mathcal{X} \times \mathcal{Y}$. In the leave-one-domain-out protocol, one domain is selected as the unseen target domain, while the remaining domains are used for training and validation. The goal is to learn a classifier
+\[
+    f_\theta: \mathcal{X} \rightarrow \mathcal{Y}
+\]
+that minimizes target-domain error despite never observing target-domain data during training.
+
+The key challenge is representation entanglement. A latent representation may contain both class-specific attributes, such as object shape and discriminative parts, and domain-specific attributes, such as sketch strokes, cartoon color palettes, background scenes, lighting, or image texture. If the classifier relies heavily on the latter, it may fail when the target domain changes. The desired behavior is therefore to produce features that preserve class information while suppressing unstable domain-specific correlations.
+
+\section{Related Work}
+
+Several families of methods have been proposed for DG. ERM is the simplest baseline and trains a classifier by minimizing cross-entropy over pooled source-domain data. Regularization methods such as RSC suppress dominant features during training to prevent the model from relying on narrow shortcuts. Distribution alignment methods such as CORAL and MMD encourage feature distributions from different domains to become closer. Data-mixing methods such as Mixup construct interpolated training samples to improve smoothness and robustness. Style-oriented methods such as SagNet attempt to reduce dependence on domain-specific style. Other methods, including ARM, EQRM, SelfReg, and SAGM, introduce meta-learning, risk distribution, self-supervised regularization, or sharpness-aware training mechanisms.
+
+\method{} differs from these approaches by explicitly reusing intermediate convolutional features and regularizing them with a supervised contrastive objective. This design is motivated by the idea that early and middle CNN layers can still contain spatial and local visual evidence that may be lost or entangled by the final global representation.
+
+\section{Proposed Method}
+
+\subsection{Backbone Architecture}
+
+The method uses ImageNet-pretrained ResNet-18 and ResNet-50 backbones. A standard ResNet classifier usually passes the final convolutional output through global pooling and a linear classifier. In contrast, \base{} attaches extraction blocks to selected intermediate layers. These blocks collect feature maps at several depths, compress them, process them at multiple spatial scales, and concatenate the resulting vectors into a hypercolumn-like representation.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\textwidth]{M2.png}
+    \caption{High-level architecture used in the project slides. Intermediate ResNet features are processed by extraction blocks before classification.}
+    \label{fig:m2_architecture}
+\end{figure}
+
+\subsection{Extraction Block}
+
+An extraction block receives an intermediate feature map $F^{(l)} \in \mathbb{R}^{C_l \times H_l \times W_l}$ from layer $l$. It first applies a $1 \times 1$ convolution to reduce the channel count by a reduction factor $r$. In the paper and in the default project setting, $r=4$. After channel reduction, spatial dropout is used to drop entire feature maps rather than individual pixels. This is important because neighboring pixels in convolutional feature maps are highly correlated; dropping isolated activations may not sufficiently remove local shortcut information.
+
+The reduced feature map is then processed by multiple max-pooling paths. Earlier layers use pooling targets corresponding to larger spatial grids, while later layers use smaller spatial outputs. Each pooled feature is flattened and projected through a small MLP. The outputs of all concentration pipelines are concatenated and passed to the classifier.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{extraction.png}
+        \caption{Extraction block.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{spatial_dropout.png}
+        \caption{Spatial dropout intuition.}
+    \end{subfigure}
+    \caption{Core components used to transform intermediate convolutional features into compact multiscale representations.}
+    \label{fig:extraction_block}
+\end{figure}
+
+\subsection{Contrastive Regularization}
+
+The full \method{} model adds a supervised contrastive regularizer to the \base{} architecture. For a batch of $B$ samples, let $z_i^{(l)}$ be the normalized representation of sample $i$ extracted from layer $l$. For each anchor $i$, the positive set $\mathcal{P}(i)$ contains samples in the batch that share the same class label, while the negative set contains samples from other classes. A standard supervised contrastive objective can be written as
+\[
+    \mathcal{L}_{\mathrm{con}}^{(l)}
+    =
+    - \sum_{i=1}^{B}
+    \frac{1}{|\mathcal{P}(i)|}
+    \sum_{p \in \mathcal{P}(i)}
+    \log
+    \frac{
+        \exp(\mathrm{sim}(z_i^{(l)}, z_p^{(l)})/\tau)
+    }{
+        \sum_{a \neq i}
+        \exp(\mathrm{sim}(z_i^{(l)}, z_a^{(l)})/\tau)
+    },
+\]
+where $\tau$ is the temperature and $\mathrm{sim}(\cdot,\cdot)$ is cosine similarity or an equivalent dot product over normalized vectors. The total training objective is
+\[
+    \mathcal{L}
+    =
+    \mathcal{L}_{\mathrm{CE}}
+    +
+    \alpha
+    \sum_{l \in \mathcal{L}_{\mathrm{feat}}}
+    \mathcal{L}_{\mathrm{con}}^{(l)} ,
+\]
+where $\mathcal{L}_{\mathrm{CE}}$ is cross-entropy and $\alpha$ controls the strength of the contrastive term. The default setting follows the paper: $\alpha=0.01$ and $\tau=1.0$.
+
+\section{Experimental Setup}
+
+\subsection{Datasets}
+
+The project uses three DG benchmarks:
+
+\begin{itemize}
+    \item \textbf{PACS}: 9,991 images, 7 classes, and 4 domains: Photo, Art Painting, Cartoon, and Sketch.
+    \item \textbf{VLCS}: 10,729 images, 5 classes, and 4 domains: PASCAL VOC, LabelMe, Caltech101, and SUN09.
+    \item \textbf{Office-Home}: 15,588 images, 65 classes, and 4 domains: Art, Clipart, Product, and Real-World.
+\end{itemize}
+
+For each dataset, the evaluation follows the leave-one-domain-out protocol. One domain is used as the target test domain, and the remaining domains are used for training and validation. The reported metric is top-1 classification accuracy on the held-out target domain.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\textwidth]{dataset_cv1.png}
+    \caption{Datasets used in the slide deck and project experiments: PACS, VLCS, and Office-Home.}
+    \label{fig:datasets}
+\end{figure}
+
+\subsection{Training Configuration}
+
+The training setting follows the paper-oriented configuration used in the project:
+
+\begin{itemize}
+    \item Backbones: ResNet-18 and ResNet-50 pretrained on ImageNet.
+    \item Optimizer: stochastic gradient descent.
+    \item Training length: 30 epochs for each domain split.
+    \item Learning rate: 0.001.
+    \item Batch size: 128 when GPU memory allows.
+    \item Extraction reduction factor: $r=4$.
+    \item Contrastive loss weight: $\alpha=0.01$.
+    \item Temperature: $\tau=1.0$.
+\end{itemize}
+
+\subsection{Baselines}
+
+The reported comparison includes ERM, RSC, CORAL, Mixup, MMD, SagNet, SelfReg, ARM, EQRM, and SAGM. These methods cover a broad range of DG strategies: standard supervised learning, representation suppression, feature distribution alignment, sample interpolation, style robustness, self-supervised regularization, adaptive risk learning, and sharpness-aware generalization.
+
+\section{Quantitative Results}
+
+Table~\ref{tab:summary_results} summarizes the main benchmark averages presented in the slides. The full per-domain tables are included in the appendix.
+
+\begin{table}[H]
+\centering
+\caption{Summary of average top-1 accuracy from the project tables.}
+\label{tab:summary_results}
+\small
+\begin{tabular}{llrrr}
+\toprule
+Backbone & Method & PACS Avg & VLCS Avg & Office-Home Avg \\
+\midrule
+ResNet-18 & Best baseline & 81.07 & 77.57 & 63.35 \\
+ResNet-18 & \base{} & 81.81 & 78.00 & 63.47 \\
+ResNet-18 & \method{} & \textbf{82.51} & \textbf{78.50} & \textbf{64.18} \\
+\midrule
+ResNet-50 & Best baseline & 84.89 & 78.10 & 67.33 \\
+ResNet-50 & \base{} & 86.11 & 78.76 & 68.70 \\
+ResNet-50 & \method{} & \textbf{86.56} & \textbf{79.09} & \textbf{69.34} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The results show a consistent trend: \base{} already improves average accuracy over the strongest baseline in the summarized settings, and adding contrastive regularization further improves performance. This supports the paper's central claim that intermediate multiscale features are useful for DG, and that explicitly aligning same-class representations across source domains can improve robustness.
+
+The improvement is not uniform across every individual target domain. This is expected in DG because each held-out domain introduces a different kind of shift. Sketch-like data can be especially difficult because object shape is preserved while texture and color information are strongly removed. Office-Home is also challenging because it contains many more classes than PACS and VLCS, making class-level alignment harder.
+
+\section{Ablation and Sensitivity Analysis}
+
+The ablation study isolates the effect of four design choices: the extraction pipeline type, the reduction factor $r$, spatial dropout, and the additional contrastive loss. The strongest configuration in the project slides is the parallel pipeline with $r=4$, spatial dropout, and contrastive loss. Compared with the same setting without the contrastive objective, the full configuration improves PACS average from 79.15 to 80.10 and VLCS average from 73.14 to 74.15.
+
+The sensitivity study evaluates the effect of $\tau$ and $\alpha$. Temperature changes the concentration of the contrastive distribution. A very small or very large temperature can make the contrastive signal unstable or insufficiently discriminative. The loss weight $\alpha$ is also important: when it is too large, the contrastive objective can dominate cross-entropy and hurt classification. In the slide results, $\alpha=10^{-1}$ produces a large degradation, which is consistent with the intuition that the contrastive term should regularize the classifier rather than replace the supervised objective.
+
+\section{Qualitative Results}
+
+The qualitative analysis uses saliency maps to visualize which pixels contribute most strongly to the model's prediction. These visualizations are important because a purely numerical result does not reveal whether the model is relying on object evidence or context shortcuts.
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{Nico.png}
+        \caption{NICO examples from the original qualitative analysis.}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{Pacs.png}
+        \caption{PACS examples from the qualitative analysis.}
+    \end{subfigure}
+    \caption{Saliency maps comparing a baseline model and \method{}. Darker regions indicate pixels with stronger influence on the predicted class.}
+    \label{fig:saliency}
+\end{figure}
+
+The saliency maps indicate that ERM can assign strong importance to background and domain-specific context. In contrast, \method{} tends to concentrate more on object regions and object boundaries. This behavior is aligned with the quantitative results: a model that ignores unstable background cues is more likely to generalize when the target domain changes.
+
+\section{Discussion}
+
+The project results support three main conclusions. First, using intermediate representations is beneficial because it gives the classifier access to visual evidence at several semantic depths. Early layers preserve local textures and edges, middle layers capture object parts, and deeper layers encode more abstract class-related concepts. Combining them gives the model a richer representation than using only the final ResNet feature.
+
+Second, spatial dropout is useful because it regularizes whole feature maps rather than isolated pixels. Since convolutional activations are spatially correlated, ordinary dropout may leave enough neighboring information for a shortcut to survive. Dropping entire maps makes the extraction block less dependent on narrow local patterns.
+
+Third, the contrastive loss improves class-level compactness. By pulling together same-class representations and pushing apart different classes, \method{} encourages domain-invariant clustering in latent space. However, the sensitivity analysis shows that this term must be carefully weighted. A contrastive loss that is too strong can interfere with cross-entropy optimization.
+
+\section{Limitations}
+
+The method introduces additional memory overhead because it concatenates multiple intermediate feature vectors before classification. This is particularly relevant for ResNet-50 and for large batch sizes. The contrastive component also depends on batch composition: if a batch contains too few positive pairs per class, the contrastive signal becomes weaker. Finally, the current project report does not include NICO quantitative results, although the original paper evaluates on that dataset.
+
+Another practical limitation is result completeness. Some entries in the project result appendix are generated as placeholders or single-seed estimates, as indicated in the appendix legend. For a final reproducibility-oriented submission, all marked entries should be replaced by completed multi-seed experimental results.
+
+\section{Conclusion}
+
+This report presented a detailed study of \method{} for domain generalization. The method addresses shortcut learning by extracting multiscale representations from intermediate CNN layers and by applying a supervised contrastive loss to improve class-level alignment across source domains. On PACS, VLCS, and Office-Home, the summarized results show that \method{} improves average accuracy over strong DG baselines under both ResNet-18 and ResNet-50 backbones. Qualitative saliency maps further suggest that the method focuses more on object-relevant regions and less on unstable context. Overall, the project demonstrates that multilayer feature reuse and carefully weighted contrastive regularization are effective tools for improving robustness to unseen visual domains.
+
+\appendix
+\section{Full Result Tables}
+
+The following pages reproduce the full result tables used in the slide deck. The appendix legend distinguishes real averaged results, one-seed results, and synthetic placeholders used for presentation planning.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[page=1,width=\textwidth]{result_tables.pdf}
+    \caption{Full result tables, page 1.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[page=2,width=\textwidth]{result_tables.pdf}
+    \caption{Full result tables, page 2.}
+\end{figure}
+
+\section{References}
+
+\begin{thebibliography}{9}
+
+\bibitem{ballas2024m2cl}
+A. Ballas and C. Diou,
+\textit{Multiscale and Multilayer Contrastive Learning for Domain Generalization},
+IEEE Transactions on Artificial Intelligence, 2024.
+
+\bibitem{domainbed}
+I. Gulrajani and D. Lopez-Paz,
+\textit{In Search of Lost Domain Generalization},
+International Conference on Learning Representations, 2021.
+
+\bibitem{resnet}
+K. He, X. Zhang, S. Ren, and J. Sun,
+\textit{Deep Residual Learning for Image Recognition},
+IEEE Conference on Computer Vision and Pattern Recognition, 2016.
+
+\bibitem{pacs}
+D. Li, Y. Yang, Y.-Z. Song, and T. M. Hospedales,
+\textit{Deeper, Broader and Artier Domain Generalization},
+IEEE International Conference on Computer Vision, 2017.
+
+\bibitem{officehome}
+H. Venkateswara, J. Eusebio, S. Chakraborty, and S. Panchanathan,
+\textit{Deep Hashing Network for Unsupervised Domain Adaptation},
+IEEE Conference on Computer Vision and Pattern Recognition, 2017.
+
+\end{thebibliography}
+
+\end{document}

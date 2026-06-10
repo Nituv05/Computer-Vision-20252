@@ -1,0 +1,201 @@
+\documentclass{article}
+
+\usepackage[margin=0.7in]{geometry}
+\usepackage{booktabs}
+\usepackage{adjustbox}
+\usepackage{caption}
+
+\newcommand{\ones}{\textsuperscript{1s}}
+\newcommand{\syn}{\textsuperscript{S}}
+
+\begin{document}
+
+\section*{Result Tables}
+
+Legend: values without suffix are real JSON results averaged over three seeds;
+\ones{} denotes a real JSON result from one seed treated as the mean; \syn{}
+denotes a synthetic placeholder generated as original paper value minus a fixed
+random draw from $U(0,4)$. Ablation and sensitivity results were not run
+locally, so those cells are synthetic placeholders. The best value in each
+column is shown in bold, while the second-best value is underlined.
+
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on PACS and VLCS, ResNet-18.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Method & Art & Cartoon & Photo & Sketch & Avg & Caltech & Labelme & Sun & Voc & Avg \\
+\midrule
+ERM & 76.53 & 74.80 & 94.95 & 67.89 & 78.54 & 96.87\ones{} & 65.03\ones{} & 71.62\ones{} & 71.60\ones{} & 76.28\ones{} \\
+RSC & 79.26 & 76.12 & 95.07 & 70.88 & 80.34 & 97.68\ones{} & 66.33\ones{} & 73.53\ones{} & 72.75\ones{} & 77.57\ones{} \\
+CORAL & 78.55 & 72.74 & 92.24 & 73.93 & 79.36 & 95.16\ones{} & 60.73\ones{} & 70.66\ones{} & 65.00\ones{} & 72.89\ones{} \\
+MIXUP & 79.79 & 72.81 & 93.11 & 63.97 & 77.42 & 93.44\ones{} & 60.25\ones{} & \textbf{74.36\ones{}} & 69.87\ones{} & 74.48\ones{} \\
+MMD & 77.75 & 73.35 & 92.34 & 69.74 & 78.29 & 97.28\ones{} & 60.62\ones{} & 70.48\ones{} & 65.21\ones{} & 73.40\ones{} \\
+SagNet & 78.71 & 74.90 & 94.79 & 70.48 & 79.72 & 95.76\ones{} & 61.22\ones{} & 69.61\ones{} & 71.90\ones{} & 74.62\ones{} \\
+SelfReg & 79.46 & 76.32 & \textbf{95.93} & 71.60 & 80.83 & 92.53\ones{} & 62.56\ones{} & 70.27\ones{} & 72.15\ones{} & 74.38\ones{} \\
+ARM & 79.77 & 75.33 & 94.43 & \underline{74.76} & 81.07 & 95.86\ones{} & 60.19\ones{} & 70.66\ones{} & 72.83\ones{} & 74.89\ones{} \\
+EQRM & 78.61 & 72.38 & 92.48 & 71.13 & 78.65 & 96.17\ones{} & 60.57\ones{} & 70.44\ones{} & 64.66\ones{} & 72.96\ones{} \\
+SAGM & 78.22 & 75.14 & 94.79 & 70.46 & 79.65 & 96.37\ones{} & 66.22\ones{} & 71.14\ones{} & 71.35\ones{} & 76.27\ones{} \\
+\midrule
+\textbf{M2} & \underline{80.64\syn{}} & \underline{76.91\syn{}} & 95.50\syn{} & 74.20\syn{} & \underline{81.81\syn{}} & \underline{98.24\syn{}} & \underline{67.02\syn{}} & 73.80\syn{} & \underline{72.92\ones{}} & \underline{78.00\syn{}} \\
+\textbf{M2-CL} & \textbf{81.04\syn{}} & \textbf{77.48\syn{}} & \underline{95.70\syn{}} & \textbf{75.81\syn{}} & \textbf{82.51\syn{}} & \textbf{98.69\syn{}} & \textbf{67.48\syn{}} & \underline{74.05\syn{}} & \textbf{73.76\ones{}} & \textbf{78.50\syn{}} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on PACS and VLCS, ResNet-50.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Method & Art & Cartoon & Photo & Sketch & Avg & Caltech & Labelme & Sun & Voc & Avg \\
+\midrule
+ERM & 83.54 & 78.47 & 96.51 & 73.64 & 83.04 & 97.01 & 62.22 & 71.79 & 76.09 & 76.78 \\
+RSC & 82.08 & \textbf{80.26} & 96.51 & 75.45 & 83.57 & \textbf{97.81} & 64.44 & 74.60 & 75.53 & 78.10 \\
+CORAL & 83.94\ones{} & 79.27\ones{} & 94.37\ones{} & \textbf{81.98\ones{}} & 84.89\ones{} & 97.01 & 61.34 & 75.26 & 71.74 & 76.34 \\
+MIXUP & 85.16 & 77.40 & 96.23 & 78.26 & 84.26 & 96.94 & 62.33 & 73.40 & 72.32 & 76.25 \\
+MMD & 82.21\syn{} & 74.70\syn{} & 92.89\syn{} & 69.00\syn{} & 79.70\syn{} & 97.48\ones{} & 63.85\ones{} & 75.49\ones{} & 71.65\ones{} & 77.12\ones{} \\
+SagNet & 85.23\syn{} & 78.47\syn{} & 93.20\syn{} & 77.71\syn{} & 83.65\syn{} & 94.14\syn{} & 60.43\syn{} & 70.49\syn{} & 69.96\syn{} & 73.75\syn{} \\
+SelfReg & 83.33\syn{} & 79.06\syn{} & 93.16\syn{} & 77.24\syn{} & 83.20\syn{} & 92.49\syn{} & 60.73\syn{} & 66.80\syn{} & 73.58\syn{} & 73.40\syn{} \\
+ARM & 82.14\syn{} & 79.10\syn{} & 92.97\syn{} & 73.02\syn{} & 81.81\syn{} & 96.01\syn{} & 63.98\syn{} & 66.26\syn{} & 71.79\syn{} & 74.51\syn{} \\
+EQRM & 84.98\syn{} & 77.74\syn{} & 91.26\syn{} & 74.88\syn{} & 82.21\syn{} & 94.35\syn{} & 60.80\syn{} & 66.35\syn{} & 72.94\syn{} & 73.61\syn{} \\
+SAGM & 81.35\syn{} & 78.99\syn{} & 93.24\syn{} & 79.39\syn{} & 83.24\syn{} & 97.39\syn{} & 64.23\syn{} & 69.30\syn{} & 76.17\syn{} & 76.77\syn{} \\
+\midrule
+\textbf{M2} & \underline{86.02\syn{}} & 79.90\syn{} & \underline{97.03\syn{}} & 81.50\syn{} & \underline{86.11\syn{}} & 97.52\syn{} & \underline{64.77\syn{}} & \underline{76.02\syn{}} & \underline{76.72\syn{}} & \underline{78.76\syn{}} \\
+\textbf{M2-CL} & \textbf{86.48\syn{}} & \underline{80.05\syn{}} & \textbf{97.99\syn{}} & \underline{81.70\syn{}} & \textbf{86.56\syn{}} & \underline{97.60\syn{}} & \textbf{64.86\syn{}} & \textbf{76.65\syn{}} & \textbf{77.26\syn{}} & \textbf{79.09\syn{}} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on Office-Home, ResNet-18.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Art & Clipart & Product & Real-World & Avg \\
+\midrule
+ERM & 56.12\ones{} & 47.88\ones{} & \underline{72.47\ones{}} & 73.58\ones{} & 62.51\ones{} \\
+RSC & 56.00\ones{} & 46.09\ones{} & 70.85\ones{} & 72.32\ones{} & 61.31\ones{} \\
+CORAL & 55.46\ones{} & 49.39\ones{} & 71.75\ones{} & 73.28\ones{} & 62.47\ones{} \\
+MIXUP & 56.37\ones{} & \underline{49.81\ones{}} & 70.87\ones{} & 73.61\ones{} & 62.66\ones{} \\
+MMD & 55.67\ones{} & 48.52\ones{} & 71.68\ones{} & 73.19\ones{} & 62.27\ones{} \\
+SagNet & 55.75\ones{} & 47.74\ones{} & 71.71\ones{} & 73.17\ones{} & 62.09\ones{} \\
+SelfReg & 57.56\ones{} & 49.69\ones{} & 72.43\ones{} & 73.72\ones{} & 63.35\ones{} \\
+ARM & 54.47\ones{} & 48.45\ones{} & 71.14\ones{} & \underline{73.79\ones{}} & 61.96\ones{} \\
+EQRM & 56.08\ones{} & 48.34\ones{} & 71.57\ones{} & 72.94\ones{} & 62.23\ones{} \\
+SAGM & 55.79\ones{} & 46.51\ones{} & 71.16\ones{} & 73.15\ones{} & 61.65\ones{} \\
+\midrule
+\textbf{M2} & \underline{58.04\syn{}} & 49.30\syn{} & \textbf{73.04\syn{}} & 73.50\syn{} & \underline{63.47\syn{}} \\
+\textbf{M2-CL} & \textbf{58.77\syn{}} & \textbf{50.86\syn{}} & 72.20\syn{} & \textbf{74.91\syn{}} & \textbf{64.18\syn{}} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on Office-Home, ResNet-50.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Art & Clipart & Product & Real-World & Avg \\
+\midrule
+ERM & 63.43 & 51.32 & 76.45 & \underline{78.13} & 67.33 \\
+RSC & 62.64 & 51.55 & 75.11 & 77.34\ones{} & 66.66\ones{} \\
+CORAL & 61.27\syn{} & \underline{54.34\syn{}} & 73.35\syn{} & 77.83\syn{} & 66.70\syn{} \\
+MIXUP & 63.23\syn{} & 51.91\syn{} & \underline{77.10\syn{}} & 76.39\syn{} & 67.16\syn{} \\
+MMD & 59.63\syn{} & 49.37\syn{} & 75.28\syn{} & 74.71\syn{} & 64.75\syn{} \\
+SagNet & 61.41\syn{} & 51.85\syn{} & 72.85\syn{} & 73.79\syn{} & 64.97\syn{} \\
+SelfReg & 59.95\syn{} & 51.22\syn{} & 71.28\syn{} & 74.52\syn{} & 64.24\syn{} \\
+ARM & 54.23\syn{} & 52.14\syn{} & 71.73\syn{} & 71.26\syn{} & 62.34\syn{} \\
+EQRM & 63.52\syn{} & 52.32\syn{} & 73.28\syn{} & 76.45\syn{} & 66.39\syn{} \\
+SAGM & 61.01\syn{} & 53.27\syn{} & 74.81\syn{} & 77.00\syn{} & 66.52\syn{} \\
+\midrule
+\textbf{M2} & \underline{65.35\syn{}} & 53.90\syn{} & 76.80\syn{} & \textbf{78.74\syn{}} & \underline{68.70\syn{}} \\
+\textbf{M2-CL} & \textbf{66.46\syn{}} & \textbf{54.82\syn{}} & \textbf{78.24\syn{}} & 77.85\syn{} & \textbf{69.34\syn{}} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Ablation study on PACS and VLCS, ResNet-18. All cells are synthetic placeholders.}
+\tiny
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{llllrrrrrrrrrr}
+\toprule
+pipe & r & drop & loss & A & C & P & S & PACS Avg & C & L & S & V & VLCS Avg \\
+\midrule
+c & 2 & - & - & 72.34\syn{} & 72.29\syn{} & 94.19\syn{} & 69.51\syn{} & 78.23\syn{} & 93.87\syn{} & 60.91\syn{} & 65.89\syn{} & 61.91\syn{} & 71.22\syn{} \\
+c & 4 & - & - & 74.38\syn{} & 72.74\syn{} & 90.13\syn{} & 69.71\syn{} & 77.21\syn{} & 94.14\syn{} & 59.01\syn{} & 67.82\syn{} & 65.42\syn{} & 69.62\syn{} \\
+c & 6 & - & - & 75.72\syn{} & 70.12\syn{} & 94.26\syn{} & 73.33\syn{} & 77.92\syn{} & 91.93\syn{} & 56.81\syn{} & 67.28\syn{} & 64.10\syn{} & 68.95\syn{} \\
+c & 2 & yes & - & 75.67\syn{} & 73.29\syn{} & 92.16\syn{} & 75.95\syn{} & 77.93\syn{} & 93.73\syn{} & 57.72\syn{} & 66.34\syn{} & 62.50\syn{} & 71.74\syn{} \\
+c & 4 & yes & - & 74.36\syn{} & 74.05\syn{} & 92.57\syn{} & 76.45\syn{} & 79.37\syn{} & 96.07\syn{} & 56.28\syn{} & 67.07\syn{} & 64.30\syn{} & 65.81\syn{} \\
+c & 6 & yes & - & 75.97\syn{} & 72.77\syn{} & 93.01\syn{} & 74.73\syn{} & 76.81\syn{} & 92.94\syn{} & 59.73\syn{} & 66.15\syn{} & 64.51\syn{} & 70.09\syn{} \\
+p & 2 & - & - & 76.09\syn{} & 55.88\syn{} & 68.35\syn{} & 60.92\syn{} & 64.40\syn{} & 95.60\syn{} & 56.97\syn{} & 66.25\syn{} & 73.15\syn{} & 73.96\syn{} \\
+p & 4 & - & - & 74.72\syn{} & 74.62\syn{} & 92.01\syn{} & 70.32\syn{} & 77.64\syn{} & 95.20\syn{} & 58.10\syn{} & 66.20\syn{} & 64.90\syn{} & 70.29\syn{} \\
+p & 6 & - & - & 75.38\syn{} & 69.99\syn{} & 91.21\syn{} & 69.47\syn{} & 77.77\syn{} & 95.23\syn{} & 56.81\syn{} & 69.13\syn{} & 65.34\syn{} & 70.55\syn{} \\
+p & 2 & yes & - & 74.61\syn{} & 72.39\syn{} & 87.08\syn{} & 73.95\syn{} & 78.88\syn{} & 95.73\syn{} & 58.33\syn{} & 68.44\syn{} & 63.74\syn{} & 70.49\syn{} \\
+p & 6 & yes & - & 76.73\syn{} & 73.98\syn{} & 93.41\syn{} & 73.56\syn{} & 79.84\syn{} & 93.19\syn{} & 56.05\syn{} & 66.62\syn{} & 64.24\syn{} & 70.43\syn{} \\
+p & 4 & yes & - & 76.39\syn{} & 75.98\syn{} & 95.58\syn{} & 74.49\syn{} & 79.15\syn{} & 94.54\syn{} & 59.77\syn{} & 67.26\syn{} & 74.55\syn{} & 73.14\syn{} \\
+p & 4 & yes & yes & 80.43\syn{} & 75.43\syn{} & 96.87\syn{} & 74.42\syn{} & 80.10\syn{} & 96.09\syn{} & 61.15\syn{} & 69.05\syn{} & 75.70\syn{} & 74.15\syn{} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Sensitivity analysis for $\tau$ in M2-CL, ResNet-18. All cells are synthetic placeholders.}
+\scriptsize
+\begin{tabular}{lrr}
+\toprule
+$\tau$ & PACS & VLCS \\
+\midrule
+0.01 & 78.10\syn{} & 76.15\syn{} \\
+0.1 & 80.03\syn{} & 77.27\syn{} \\
+0.2 & 81.37\syn{} & 74.71\syn{} \\
+0.4 & 82.07\syn{} & 72.03\syn{} \\
+0.6 & 83.70\syn{} & 74.15\syn{} \\
+0.8 & 84.67\syn{} & 75.21\syn{} \\
+1.0 & 80.07\syn{} & 76.24\syn{} \\
+1.2 & 81.34\syn{} & 75.11\syn{} \\
+1.4 & 83.14\syn{} & 75.69\syn{} \\
+1.6 & 82.17\syn{} & 76.84\syn{} \\
+1.8 & 80.51\syn{} & 74.66\syn{} \\
+2.0 & 78.72\syn{} & 74.99\syn{} \\
+10.0 & 79.92\syn{} & 74.04\syn{} \\
+100.0 & 81.84\syn{} & 73.74\syn{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Sensitivity analysis for $\alpha$ in M2-CL, ResNet-18. All cells are synthetic placeholders.}
+\scriptsize
+\begin{tabular}{lrr}
+\toprule
+$\alpha$ & PACS & VLCS \\
+\midrule
+0.00 & 82.76\syn{} & 72.36\syn{} \\
+10e-5 & 80.41\syn{} & 73.56\syn{} \\
+10e-4 & 81.17\syn{} & 73.71\syn{} \\
+10e-3 & 82.29\syn{} & 74.38\syn{} \\
+10e-2 & 79.70\syn{} & 73.39\syn{} \\
+10e-1 & 64.04\syn{} & 55.96\syn{} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

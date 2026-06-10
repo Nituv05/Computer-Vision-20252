@@ -234,7 +234,8 @@ different reduction ratios and dropout settings, and the full M2-CL model. Each
 variant is saved with a `--tag`, so summaries do not mix several M2 variants
 under one name.
 
-Architecture ablation for pipeline type, reduction ratio, dropout and loss:
+Architecture ablation for pipeline type, reduction ratio, dropout and loss
+on a single target domain:
 
 ```bash
 python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study architecture
@@ -247,7 +248,43 @@ python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_
 python ablation.py --dataset pacs --test_domain photo --data_root /path/to/data_root --study alpha
 ```
 
-Use `--dry_run` to print commands without running them.
+To reproduce the slide/report ablation tables, run the table mode. This expands
+to all domains of PACS and VLCS and supports `--seeds`, `--skip_existing`,
+W&B logging and `--dry_run`:
+
+```bash
+python ablation.py \
+  --tables all \
+  --datasets pacs vlcs \
+  --data_root /path/to/data_root \
+  --backbone resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --batch_size 128 \
+  --lr 0.001 \
+  --hparams_profile paper \
+  --holdout_fraction 0.2 \
+  --scheduler none \
+  --num_workers 4 \
+  --save_dir outputs/ablation_tables \
+  --skip_existing
+```
+
+Individual table modes are available:
+
+```bash
+python ablation.py --tables 5 --datasets pacs vlcs --data_root /path/to/data_root
+python ablation.py --tables 6 --datasets pacs vlcs --data_root /path/to/data_root
+python ablation.py --tables 7 --datasets pacs vlcs --data_root /path/to/data_root
+```
+
+Use `--dry_run` to print commands without running them. After training, summarize:
+
+```bash
+python summarize_results.py \
+  --metrics_dir outputs/ablation_tables \
+  --output_csv outputs/ablation_tables/results.csv
+```
 
 ## Saliency Maps
 

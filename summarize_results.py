@@ -48,6 +48,11 @@ def main():
             "seed": row["seed"],
             "test_acc": acc,
             "best_epoch": row.get("best_epoch", ""),
+            "alpha": row.get("alpha", ""),
+            "temperature": row.get("temperature", ""),
+            "pipeline_type": row.get("pipeline_type", ""),
+            "reduction_ratio": row.get("reduction_ratio", ""),
+            "dropout_p": row.get("dropout_p", ""),
             "checkpoint": row.get("checkpoint", ""),
         })
 
@@ -89,6 +94,8 @@ def main():
                 fieldnames=[
                     "dataset", "method", "backbone", "split", "seed",
                     "tag", "method_label", "test_acc", "best_epoch",
+                    "alpha", "temperature", "pipeline_type",
+                    "reduction_ratio", "dropout_p",
                     "checkpoint",
                 ],
             )

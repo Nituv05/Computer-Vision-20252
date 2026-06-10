@@ -1,0 +1,2207 @@
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+1
+
+Multiscale and Multilayer Contrastive Learning for
+Domain Generalization
+
+arXiv:2308.14418v5 [cs.CV] 10 May 2024
+
+Aristotelis Ballas
+
+and Christos Diou
+
+Abstract—During the past decade, deep neural networks
+have led to fast-paced progress and significant achievements
+in computer vision problems, for both academia and industry.
+Yet despite their success, state-of-the-art image classification
+approaches fail to generalize well in previously unseen visual
+contexts, as required by many real-world applications. In this
+paper, we focus on this domain generalization (DG) problem and
+argue that the generalization ability of deep convolutional neural
+networks can be improved by taking advantage of multi-layer
+and multi-scaled representations of the network. We introduce
+a framework that aims at improving domain generalization of
+image classifiers by combining both low-level and high-level
+features at multiple scales, enabling the network to implicitly
+disentangle representations in its latent space and learn domaininvariant attributes of the depicted objects. Additionally, to further facilitate robust representation learning, we propose a novel
+objective function, inspired by contrastive learning, which aims
+at constraining the extracted representations to remain invariant
+under distribution shifts. We demonstrate the effectiveness of
+our method by evaluating on the domain generalization datasets
+of PACS, VLCS, Office-Home and NICO. Through extensive
+experimentation, we show that our model is able to surpass the
+performance of previous DG methods and consistently produce
+competitive and state-of-the-art results in all datasets1 .
+Impact Statement—Domain Generalization is one of the most
+important problems in machine learning today. Popular image classification architectures show significant performance
+degradation when evaluated on data originating from different
+distributions than the one(s) they were trained on. This is a
+common scenario in real-world applications, rendering it a significant constraint of current state of the art image classification
+models. The domain generalization algorithm we introduce in
+this paper attempts to overcome such limitations by utilizing and
+regularizing representations across convolutional neural network
+architectures, in order to learn domain-invariant attributes of
+an image. With a noteworthy increase in model accuracy, our
+algorithm is able to set the state-of-the-art in a total of 4
+widely accepted DG datasets. In addition, qualitative samples
+of our model’s inference process provide further validation of
+our claims2 .
+Index Terms—Domain generalization, Representation learning,
+Contrastive learning, Image classification
+
+Manuscript created February, 2023; revised 27 May 2023, 27 August 2023,
+27 November 2023 and 30 January 2024; accepted 8 March 2024. The work
+leading to these results has received funding from the European Union’s
+Horizon 2020 research and innovation programme under Grant Agreement
+No. 965231, project REBECCA (REsearch on BrEast Cancer induced chronic
+conditions supported by Causal Analysis of multi-source data).
+A. Ballas is with the Department of Informatics and Telematics, Harokopio
+University of Athens, Tavros, 177 78 Greece (e-mail: aballas@hua.gr).
+C. Diou is with the Department of Informatics and Telematics, Harokopio
+University of Athens, Tavros, 177 78 Greece (e-mail: cdiou@hua.gr).
+1 Code available at: https://github.com/aristotelisballas/m2cl
+2 Paper DOI: 10.1109/TAI.2024.3377173
+
+, Member, IEEE
+
+Fig. 1. In this work, the main goal is to improve the ability of a model to
+uncover a disentangled representation of an input image. This disentangled
+representation of the image can be thought of as a sequence of classspecific a1 , a2 or domain-specific d1 , d2 , d3 , d4 (but perhaps class-irrelevant)
+attributes. For example, a domain-specific feature can be attributed to a “patch
+of grass” in the input image, whereas the “whiskers” or “shape of ear”,
+can be thought of as class-specific. We argue that the problems caused by
+domain shift between data drawn from unknown domains can be mitigated
+by utilizing multiple levels of information passed throughout a Convolutional
+Neural Network, in order to derive disentangled representations. A classifier
+trained on such disentangled representations can then learn to infer only on
+the class-specific or causal attributes of the object depicted in the image (blue
+rectangles).
+
+I. I NTRODUCTION
+
+H
+
+UMAN beings are capable of creating abstractions in
+order to better understand their environment. Even from
+an early age, we are able to easily extract knowledge from
+different settings and generalize it to previously unknown circumstances. When classifying images, we base our decisions
+on the distinguishable characteristics of the depicted class and
+stand unfazed when presented with irregular qualities -seeing
+a cat orbiting the moon may seem odd, but we still recognize
+it as a cat-. In contrast, state-of-the-art computer vision models often fail to mimic a human’s adaptability prowess and
+perform very poorly when presented with previously ‘unseen’
+contexts.
+In recent years, Deep Learning models have reached, or
+even surpassed, human accuracy on several difficult computer
+vision tasks [1]. Despite their outstanding success, these models fail to maintain their performance at a high level when
+presented with data originating from a different distribution
+than the one(s) they were trained on [2], [3]. In particular,
+popular Convolutional Neural Network (CNN) architectures
+fail to differentiate between spurious correlations or data biases
+(e.g background, position, selection bias, etc) and truly classrepresentative features of an image.
+Several approaches have been proposed to address this
+problem (Section II). These include methods that aim to extract
+common semantic features among source domains, emulating
+biases found in nature, synthesizing samples by mixing data
+characteristics or using self-supervision to discover invariances
+
+2
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+in images.
+In this paper, we argue that allowing a model to learn
+by using features of varying complexity and at multiple
+scales, facilitates the disentanglement of deep representations
+which tend to incorporate spurious correlations and enables a
+classifier to learn based on domain-invariant features. To this
+end, we propose a framework which leverages information
+extracted from intermediate layers of a CNN, combined with
+a loss function to disentangle the invariant features of the
+target class. Our method introduces an extraction block which
+consolidates feature maps from layers across a backbone CNN
+and uses them for robust, non-identically distributed image
+classification. To further facilitate the feature disentanglement
+capabilities of our model, we also propose adding a novel contrastive loss function which explicitly regularizes the training
+process into extracting causal, class-dependent representations
+which remain invariant under data distribution shifts. Inspired
+by the multi-scale and multi-layer representation processing,
+we name our method M2 . With the addition of the proposed
+contrastive loss, our method becomes M2 -CL.
+We evaluate both of our models on four domain generalization benchmarks, PACS [4], VLCS [5], Office-Home [6] and
+NICO [7]. Several ablation studies demonstrates the necessity
+of each component in our proposed framework and provide
+further intuition regarding the effectiveness of the proposed
+approach. While our M2 model is able to consistently produce
+competitive results and set the state-of-the-art in several cases,
+the addition of our proposed novel contrastive loss function
+boosts its performance in each setting. Our contributions in
+this work, include the following:
+2
+• We introduce a neural network architecture, namely M ,
+that uses extraction blocks and concentration pipelines
+to implicitly disentangle representations in the models’
+latent space and disregards the ones corresponding to spurious correlations between data from distinctive domains.
+• We propose the addition of a novel training loss function
+inspired by contrastive learning, for further facilitating
+the training of our proposed model, called M2 -CL.
+• We experimentally demonstrate the effectiveness of our
+method on four widely accepted Domain Generalization
+benchmarks.
+• We illustrate, through examples, that our model indeed
+seems to focus on the invariant properties of the objects
+by producing saliency maps of multiple, unseen, input
+images. These examples indicate that when compared
+to a baseline model, our framework pays less attention
+to the contexts present in the image and instead makes
+predictions based on causal features.
+II. P REVIOUS W ORK
+There exist several previous works related to domain generalization in the machine learning literature. In this section,
+we summarize some of the most important contributions to
+the field and briefly present related works regarding robust
+representation learning algorithms.
+Domain Adaptation (DA) [8] has made noteworthy
+progress in the past few years. DA algorithms take advantage
+
+of pre-trained models and leverage their feature extraction
+capabilities, by fine-tuning them on previously unknown data
+distributions or target domains. To mitigate the distribution
+shift problem between source and target domain data, [9],
+[10], [11], [12], [13] use an MMD-based (Maximum Mean
+Discrepancy) loss, in an attempt to align the source and
+target distributions. For the same purpose, [14], [15], [16]
+use an adversarial loss. Another popular approach in DA, is
+the identification of invariant representations between data.
+To this end, Generative Adversarial Networks (GAN) [17]
+were proposed. GANs consist of a generator and a domain
+discriminator. Namely, the generator’s goal is to synthesize
+and mimic data from the source domains, in order to fool the
+discriminator. Furthermore, in [18] the authors introduce the
+LIRR algorithm in Semi-Supervised DA, for learning invariant
+representations and risks. Other methods, such as pseudolabeling [19], [20], reconstruction [21], [22], regularization
+[23], [24], [25], unsupervised domain adaptation with mixup
+training [26] and self-ensembling [27], also prove to be
+effective in the DA setting.
+Disentangled Representation Learning [28], [29] aims to
+decompose the input data into separate disentangled independent factors. The authors of [29] argue that by disentangling
+their feature space, models can leverage the causal attributes of
+the deconstructed data during downstream tasks. A common
+practice is to train generative models, such as GANs or
+VAEs [30], [31], paired with latent space constraints such as
+mutual information [32], information bottleneck [33] and KLdivergence [34], [35].
+Contrastive Learning [36] is a machine learning technique
+proposed for extracting useful representations from unlabeled
+images. As its name suggests, the core principle behind
+contrastive learning is contrasting images against each other in
+order to learn image features which remain similar across data
+classes and representations which separates one class from
+another.
+To this end, a plethora of works utilizing contrastive learning
+have been proposed. Most noteworthy, SimCLR [37] focuses
+on maximizing the similarity of representations extracted from
+augmented views of the same image (positive pairs), while
+also maximizing the dissimilarity of representations extracted
+from different images (negative pairs). Similarly, MoCO [38]
+utilizes a memory bank for handling a larger number of
+negative pairs in each batch during training, while other
+implementations such as BYOL [39] and SimSiam [40] do
+not use negative pairs at all.
+Finally, fine-grained image analysis (FGIA) [41] algorithms deal with distinguishing visual objects from subordinate
+categories (e.g different species of dogs). Models tasked with
+fine-grained image classification attempt to learn representations which correspond to subtle details, such as annotated key
+point locations, which assist in differentiating between interclass image variations. To tackle FGIA, the authors of [42],
+[43] and [44] proposed training end-to-end fine-grained CNN
+models. In their work, the authors significantly improved a
+base models recognition capabilities by employing an additional 1 × 1 convolutional filter for detecting small patches
+in images. In addition, attention mechanisms [45], [46] have
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+also been proposed achieving strong accuracy in downstream
+tasks.
+Domain Generalization [3] methods focus on maintaining
+high accuracy across both known and unknown data distributions. The core difference between DG and other settings
+is the fact that during training the model has no access
+to the test domains/distributions whatsoever, which makes
+it a significantly more difficult problem than DA. Furthermore, in contrast to FGIA algorithms which are tasked to
+recognize inter-class representation variability, DG aims to
+employ mechanisms which extract image features that remain
+invariant under domain shift. The DG problem can be split
+into two settings [3]: Multi-Source DG and Single-Source
+DG. In multi-source DG, it assumed that data is sampled
+from multiple distinct but similar domains. Therefore, domain
+labels are leveraged to learn stable representations across the
+source domains. In contrast, single-source DG assumes that
+the training data is sampled from a single distribution and
+is unaware of the presence of separate domains. Our work
+falls in the second category, as it does not take advantage
+of domain labels and acts in a domain-agnostic manner.
+Similarly, the authors of [47] use Random Fourier Features and
+sample weighting to compensate for the complex, non-linear
+correlations among non-iid data distributions. In [48], the authors introduce RSC, a self-challenging training heuristic that
+discards representations associated with the higher gradients.
+[49] proposes solving jigsaw puzzles via a self-supervision
+task, in an attempt to restrict semantic feature learning. On
+the other hand, a plethora of works have been proposed for
+multi-source DG as well. The authors of [50] introduce deep
+CORAL, a method to align correlations of layer activations in
+DNNs. Meta-learning approaches have also been proposed, in
+[51], [52] and Adaptive Risk Minimization (ARM) [53], which
+leverage a meta-learning paradigm for adapting to unseen
+domains. Additionally, [54] takes advantage of the variational
+bounds of mutual information in the meta-learning setting and
+uses episodic training to extract invariant representations. In
+another approach, Style-Agnostic networks, or SagNets [55],
+attempt to reduce the gap between domains, by focusing on
+disentangling style encodings. Furthermore, the authors of [56]
+combine batch and instance normalization to extract domainagnostic feature representations, while [57] and [58] explore
+the use of data augmentation and style-mixing techniques in
+the DG setting, respectively. The authors of [59] propose
+to address DG by formulating an empirical quantile risk
+minmization problem (EQRM), in order to learn predictors
+with high probability. More recently, SAGM [60] proposes
+aligning the gradient directions between the empirical risk
+and a perturbation loss for improved model generalization.
+Finally, ensemble methods seem to yield a significant performance improvement in several DG benchmarks. For example,
+SIMPLE [61] leverages a large number of pre-trained models
+and deploys the most appropriate one for prediction, based on
+a matching metric on target OOD samples. Similarly, SWADbased methods [62] have also been proposed. MIRO [63]
+takes advantage of an Oracle model and regularizes pre-trained
+models via Mutual Information, while PCL [64] uses a proxybased contrastive method in conjuction with SWAD.
+
+3
+
+For our method, we drew inspiration from previous relevant
+research. The utilization of multi-layer representations has
+been explored before with several proposed NN architectures. In [65], the authors introduced the Hypercolumns and
+Efficient Hypercolums methods in order to take advantage
+of the different level of information throughout a neural
+network. However, in order to use the above methods it
+is expected that bounding boxes for the points of interest
+of the image are provided. By adapting the Hypercolumns
+method to the image classification DG setting, the proposed
+algorithm in [66] demonstrates improved performance in the
+NICO dataset over a fully-supervised baseline model. The
+authors of [67], propose upsampling extracted feature maps
+from intermediate layers of a CNN and concatenating them
+to later layers of the network, for biomedical image segmentation. The processing of intermediate features, has also
+been reported to improve performance in other fields, such
+as 1D biosignal classification [68]. By directly connecting
+any layer, and passing all its feature maps to all subsequent
+layers, DenseNets [69] explore feature reuse for classic image
+classification downstream tasks. Regularization techniques for
+learning class-discriminative features have also been proposed
+in the past. [70] proposes a self-distillation loss that injects the
+model’s softmax output into the shallower layers to learn more
+discriminative features of a class object. [71] shows if highly
+class-discriminative features are learned in the shallow layers,
+even the class-relevant information required for the deeper
+layers may be discarded. Specifically for DG, [72] proposes
+SelfReg which uses self-supervised contrastive losses coupled
+with class-specific domain perturbation layers and gradient
+stabilization techniques to learn domain-invariant features of
+a class, while the authors of [73] propose applying attention
+mechanisms to intermediate feature maps. Our framework,
+in contrast to previously proposed algorithms, encodes the
+extracted information without injecting it back into the network and potentially propagating spurious, domain-relevant
+features. Furthermore, the addition of our proposed contrastive
+loss term in the training process enables our model to extract
+and encode class-relevant representations at every level of the
+network, without needing to solely rely on the information
+extracted from the last layer, as in most papers leveraging
+contrastive learning frameworks.
+III. M ETHODS
+A. Motivation - Entangled Representations in Deep CNN
+Image Classification
+There exists an intuition as to how deep CNNs learn to
+classify images. Based on illustrations [74], [75] of the learnt
+features of trained convolutional filters in a CNN, early layers
+tend to detect low-level features in an image, such as edges
+or lines, whereas the network’s deeper layers build upon these
+features through feature composition to encode more complex
+representations, such as curves, shapes, textures and ultimately,
+objects.
+When building such complex representations, feature composition may encode class-specific features jointly with
+domain-specific (but not necessarily class-relevant) attributes,
+
+4
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+Fig. 2. Each object in a certain class consists of distinguishable class-specific attributes which remain invariant between domains, e.g. a cat has whiskers
+whether there is snow or grass in the background of the image. However, the image also contains domain-specific but note necessarily class-relevant attributes
+which are entangled in the representation extracted by the final convolutional layers of popular CNN architectures, such as ResNets. The goal in DG is to
+encode such common class-specific attributes of images, in order to enable models to identify target classes across data domains. Classic fully supervised
+models learning solely via empirical risk minimization (ERM) tend to correlate the latent space representations with features found in distinct domains. In
+the above visualization, each representation attributed to a certain class is illustrated with a different shape (circle, square, triangle), while each color (blue,
+green, red) corresponds to distinct data domains. To mitigate the issues caused by domain shifts in data distributions originating from different data-generating
+processes, in this work we propose an alternative approach which: a) attempts to derive a set of disentangled representations by extracting multiple levels of
+information from intermediate CNN layers of the backbone network (M2 ) and b) brings the representations extracted from images of the same label closer
+together, while simultaneously pushes the ones originating from different classes further away (M2 -CL).
+
+into non-separable representation components. In this case, the
+network may learn to distinguish classes based on domainspecific shortcuts [76] and therefore fail to generalize across
+domains (i.e., data distributions). In fact, as formally shown
+in [77], [78] and [79], polynomially-sized deep convolutional
+networks can model complex correlations (exponentially high
+separation ranks) between groups of image regions. Without
+any remedial measures, if a correlation exists between the
+training domains and the target classes, it will be encoded
+in the learnt representation. An intuitive example regarding
+domain specific and class-specific or -irrelevant attributes, is
+depicted in Fig.1.
+We can express the above notion in a formal manner by
+following the definition of disentangled group actions and
+representations, as presented in [80]. To better understand
+the concept of a disentangled representation, we first describe
+the properties of a disentangled group action3 . Suppose that
+there exists a group G, acting on a set X, via an action
+· : G×X → X. Furthermore, suppose that G decomposes into
+the direct product of two subgroups, such that G = G1 × G2 ,
+and that each subgroup can act on X via an action ·i , i ∈ 1, 2.
+If there exists a decomposition X = X1 × X2 and for all
+(1)
+(2)
+(2)
+(1)
+x1 , x2 ∈ X1 and x1 , x2 ∈ X2 , it holds that
+(1)
+
+(2)
+
+(1)
+
+(2)
+
+(1)
+
+(1)
+
+(2)
+
+(x1 , x1 ) · (x2 , x2 ) = (x1 ·1 x2 , x1 ·2 x22 )
+
+(1)
+
+then we say that the the group action is disentangled, with
+respect to the decomposition of G. This definition can be
+directly extended for decompositions into a larger number
+of groups, i.e., G = G1 × . . . × Gn . In this case, we say
+that the group action is disentangled with respect to the
+decomposition of the group, if there exists a decomposition
+X = X1 × . . . × Xn , such that each Xi is invariant to all
+3 We use the following notation: group (G), group decomposition into a
+direct product of subgroups (G = G1 × G2 ), set X, group action on X
+(· : G × X → X), action of the i-th subgroup ·i .
+
+actions, ·j , of the subgroups Gj , j ̸= i and is only affected by
+the action of Gi , with i, j = 1, . . . , n.
+The above formalization can, in turn, be extended to the
+internal representations of a model. Suppose we have a set of
+world-states W , a generative process which leads to observations O of the world (e.g., pixels of an image) and a model
+that processes the observations, leading to a set of internal
+representations, Z. Additionally, suppose that there exists a
+group G acting on W via an action · : G × W → W , which
+can be decomposed as a direct product G = G1 × · · · × Gn .
+In our case, we assume that each subgroup action, ·i leads
+to an alteration of different image attributes. For example,
+one action could change class-related features (e.g., presence
+and appearance of a cat in an image scene) and a different
+action alters domain attributes (e.g., presence and appearance
+of grass). The goal of our work is to guide a model to produce
+a set of disentangled representations Z with respect to the
+decomposition of G, such that the set Z can be decomposed
+into Z = Z1 × · · · × Zn and that elements of each Zi are
+invariant to the actions of all Gj , j ̸= i.
+In the case of CNN models for image classification, we
+propose using intermediate layers of the CNN to derive the
+sets Zi , instead of relying on the final, entangled layer of the
+model. Specifically, let the set of representations be
+Z = Z1 × · · · × ZL−1
+
+(2)
+
+where each Zi is a set of (filter) outputs derived from an
+intermediate hidden layer and L the number of such intermediate outputs. Given an input image, if zi ∈ Zi is the
+output of the i-th filter, then
+ the model’s internal representation is z = z1 . . . zL . Training the model using this
+representation allows it to encode class-specific and domainspecific attributes separately, before these become entangled
+into progressively more complex features of subsequent layers.
+Directly implementing this approach, however, is impracti-
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+5
+
+Fig. 3. Visualization of the M2 architecture built on a ResNet-18. We propose extracting feature maps (black arrows) from layers across the ResNet-18 with
+the use of multiple extraction blocks (green boxes). The lines above the network’s conv layers represent ResNet skip connections. The solid lines indicate
+that the feature maps retain their dimension, while the feature maps passed through the dashed connection lines are downsampled to match the dimension of
+the previous layer output. Our network’s main functionality derives from the multiple parallel concentration pipelines in each extraction block. By utilizing
+feature maps from intermediate outputs of convolutional layers in the backbone model, our framework combines low-level, multi-scale features of early layers
+with more complex features extracted at layers further down the network. The parallel pipelines, aim at processing the extracted feature maps in a multi-scale
+manner, each emphasizing on a different characteristic of the object depicted in the input image. We argue that by incorporating outputs from different
+intermediate levels of the network, we enable the model to disentangle the invariant qualities of an image.
+
+cal. The outputs of intermediate CNN layers are (a) typically
+very large, leading to dimensionality and memory restrictions
+and (b) contain a lot of redundant, non-discriminative information. In this paper, we implement the proposed algorithm
+and address the aforementioned problems by considering only
+a subset of intermediate layer outputs and subsequently processing the output of such layers through extraction blocks,
+before concatenating them to the final network representation,
+with the aim to derive concise and discriminative features of
+the input image.
+B. Overview of the Proposed Approach
+The proposed architecture implements extraction block networks across multiple layers of a neural network and trains
+them to extract representations at different scales. The multiscale aspect of the extraction is included as features of intermediate network layers have not yet been spatially reduced
+by pooling layers and can appear with different sizes in the
+feature maps.
+Owing to this multi-scale and multi-level nature of extraction, this novel NN architecture is called M2 . Moreover, compelled by the representation alignment property of contrastive
+losses [81] (i.e., similar samples share similar features), we
+propose maximizing the similarity of same-class representations and simultaneously minimizing the similarity between
+the ones of a different class, in each level of extraction.
+These objectives and the role of the M2 and contrastive loss
+components are illustrated in Fig. 2.
+
+By adding such a tailored custom contrastive loss term to
+a cross-entropy loss function, the proposed M2 -CL model
+is able to yield superior accuracy in all DG benchmarks
+and surpass previous state-of-the-art models. In the following
+Sections III-C through III-E we:
+• introduce the necessary background and notations for
+classification in DG,
+• formulate the intuition behind our proposed framework,
+• present in detail the mechanisms for extracting multiscale and multi-level representations
+• describe the implementation of the proposed method on
+different network architectures.
+C. Background & Terminology
+Let a Domain s correspond to an (unknown) data distribution of samples in (X , Y). Domain Generalization algorithms focus on learning a parametric model f (·; θ), trained
+x(s) , y (s) ) drawn from a set of N source Doon samples (x
+x(t) , y (t) )
+mains {S1 , S2 , . . . , SN }, that performs well on data (x
+drawn from K target Domains {T1 , T2 , . . . , TK }.
+In this paper, we consider domain generalization for the
+image classification task and aim to improve the ability of
+a model Mθ : X → Y to encode class-specific and domainspecific attributes separately. Then, we want to train an
+Encoder fθ that can extract distinguishable and common
+attributes between source and target domains.
+We think of an object, as a mixture of class-relevant and
+domain-specific attributes (Fig. 1). Our main hypothesis is
+
+6
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+that it is challenging to avoid entangled representations, i.e.
+representations containing both invariant information about the
+class and the domain-specific (but class-irrelevant) attributes,
+when relying only on the last layers of a deep CNN. We
+therefore propose to build representations that use features
+extracted from multiple layers of the network and argue that
+images with common labels should contain and carry similar
+representations across domains. Furthermore, we argue that
+including several scales of extracted information could assist
+in capturing features that have not yet been spatially reduced
+and push the model towards disregarding representations containing non-causal attributes of the image. Moreover, we aim
+to push the model towards maximizing the similarity of representations extracted from images with the same label while
+at the same time minimizing the similarity of representations
+originating from images of different classes. The logic behind
+the implementation of each component in the proposed method
+is illustrated in Fig. 2.
+D. Extraction block
+The main mechanism for implementing the feature extraction in M2 is a custom extraction block which can be attached
+to multiple layers of the network, as illustrated in Fig. 3. The
+extraction block consists of a parallel set of concentration
+pipelines, presented in Fig. 4, which aim at the multi-scale
+processing of the intermediate convolutional layer outputs.
+More specifically, let c be the number of output channels
+of a convolutional layer. We first apply a 1 × 1 convolutional
+layer to reduce the number of channels, leading to a more
+compressed representation. This is controlled by a reduction
+parameter r, such that the output channels are ⌊c/r⌋.
+The convolutional layer is followed by a spatial dropout
+layer. This layer has been proposed by Tompson et al. [23]
+for the human pose estimation problem. In the standard
+dropout layer, individual features (i.e., pixels) of the output
+are dropped, but due to the spatial correlation of natural
+images, non-dropped neighboring features carry significant
+mutual information, rendering the dropout ineffective. The
+spatial dropout layer drops entire feature maps, thus avoiding
+this problem. Depending on the target class and image, a target
+“attribute” may appear at different scales. We therefore apply
+several k × k Max Pooling layers with stride equal to 1. The
+pool size k depends on the input and is selected such as the
+output feature maps have sizes equal to 8 × 8, 4 × 4 and 2 × 2,
+for the earlier layers, followed by 7×7 and 3×3 for the layers
+further down the network. We have experimented with both
+cascading and parallel implementations of the above pipeline
+and have found the parallel architecture to be more effective, as
+described in Section IV-D. In order to allow our model to learn
+a mapping between the extracted features, we pass each Max
+Pooling layer output through a multilayer perceptron (MLP),
+which in turn yields a vector.
+This framework is straightforward to implement and highly
+adaptable, in the sense that the extraction blocks can be
+connected to any layer of a CNN and one can use an arbitrary
+number of pipelines in each block. Moreover the proposed
+framework can be leveraged by using different CNN as a
+backbone.
+
+Fig. 4. Visualization of the Extraction Block and Concentration Pipeline
+implementation. Each block can be connected to any intermediate layer of the
+backbone model, followed by multiple concentration pipelines. Each pipeline
+consists of a 1 × 1 Convolutional, Spatial Dropout, Max Pooling and Flatten
+layer, which is thereafter passed through a multilayer perceptron (MLP) and
+connected to the framework’s concatenation layer as depicted in Fig. 3.
+
+E. Network Architecture
+The proposed architecture of M2 is illustrated in Fig. 3 and
+is built on the ResNet-18 architecture. For our method, we
+select outputs from a total of 13 intermediate conv layers of a
+CNN and pass them through an extraction block, as described
+in Section III-D.
+The selected intermediate layers include all residual half
+block layers (i.e., those leading to reduction of the output
+size), as well as selected convolutional layers. All later layers
+of the network are included. The output of each concentration
+pipeline is concatenated into a single feature vector which
+passes through a classification head with a single fullyconnected layer.
+To further demonstrate the effectiveness of our method,
+we also implement our algorithm with a larger ResNet-50
+model, in which the ratio of the additional parameters of the
+introduced extraction block and the backbone model is smaller,
+when compared to the ResNet-18 implementation. In a more
+straightforward approach, each extraction block is connected
+to the output of the last convolutional layer in each one of the
+model’s bottleneck blocks, as shown in Figure 5.
+F. A Contrastive Loss for Multi-Level Representations
+(l)
+Consider the representation u i of sample x i , which is the
+extracted and processed (via an extraction block) output of
+layer l of the neural network after normalization, such that
+u(l)
+∥u
+i ∥ = 1. We define the following probability measure of
+class c for a batch of Nb elements under this representation
+as
+Nc
+Nc
+(l)T (l)
+P
+P
+eu i u j /τ
+i=1 j=i+1
+yi =yj =c
+
+p(l) (c) = PN
+
+b
+
+k=1
+
+PNb
+
+(l)T
+
+uk
+m=l+1 e
+
+(l)
+u m /τ
+
+(3)
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+7
+
+Fig. 5. Visualization of the M2 architecture built on a ResNet-50 model. Similar to the ResNet-18 implementation in Figure 3, we once again extract feature
+maps by using multiple extraction blocks (green boxes). Our proposed extraction blocks are connected to the last convolutional layer of each of the ResNet’s
+bottleneck blocks.
+
+where Nc is the total number of elements of class c in the
+batch and τ is a temperature hyperparameter, similar to the
+terms in [37], [38], [39]. τ is an important hyperparameter in
+both contrastive [82] and fully supervised learning [83], as it
+controls the density of the probability mass distribution. Note
+that Eq. (3) increases if images of the same class have similar
+representations and images of different classes have dissimilar
+representations.
+Considering all C classes, the probability becomes
+
+Computationally, note that if U (l) is a matrix containing
+the vectors u(l) of the batch, one per row, then the inner
+(l)T (l)
+products u i u j of Eq. (3) are the elements of matrix
+U (l)T U (l) . Moreover, the denominator is the same for all
+classes. Therefore, the inner products of the denominator of
+the proposed loss (6) only needs to be computed once for each
+batch.
+
+C
+Y
+
+In our experiments, we opted for vanilla ResNet-18 and
+ResNet-50 [84] models, pre-trained on ImageNet, as the backbone networks of our method. We implemented our framework
+with the PyTorch library [85], on one NVIDIA RTX A5000
+GPU. For the optimizer, we used SGD and trained for 30
+epochs on every dataset and set the learning rate to 0.001.
+For our method we set the reduction parameter r equal to 4
+and select to implement 3 concentration pipelines per block
+in the early layers and 2 pipelines per block in the later
+ones for both the ResNet-18 and ResNet-50 implementations.
+Depending on the input of each Max Pooling layer in the
+concentration pipelines, we set the pool size k such that the
+early layers return feature maps of size 8 × 8, 4 × 4 and 2 × 2.
+Due to the size of the later convolutional layers (i.e., in the
+last residual block), we configure the max pooling layers to
+produce feature maps of size 7×7 and 3×3. In all experiments
+containing our custom loss we set the α hyperparameter 0.01
+and the temperature τ to 1.0, as default values. The value of
+α reflects the common practice in previous works proposing
+regularization methods [86]. Moreover, as different values of
+τ could affect the performance of our model in each dataset,
+
+P (l) =
+
+p(l) (c)
+
+(4)
+
+c=1
+
+We can therefore take the logarithm of P (↕) to introduce
+the following loss for layer l:
+L(l) = − log P (l) = −
+
+C
+X
+
+log p(l) (c)
+
+(5)
+
+c=1
+
+The learning objective is therefore to maximize the probability
+of all classes under this representation, or minimize L(l) , while
+at the same time maintaining the model’s effectiveness in
+discriminating the target classes. This leads to the following
+loss function
+M
+X
+L = LCE + α
+L(l)
+(6)
+l=1
+
+where M is the total number of layers which are considered
+for the representation, LCE is the cross-entropy loss and α is
+a hyperparameter indicating the magnitude of importance the
+additional objective holds in model training.
+
+IV. E XPERIMENTS
+
+8
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+we chose to set it to 1.0 for a fair comparison against all
+datasets and explore its importance in separate experiments.
+To this end, Section IV-D presents a sensitivity analysis for
+hyperparameters α and τ . Finally, for all implementations we
+use a standard batch size of 128 images.
+
+A. Datasets
+To evaluate our method, we run experiments on 4 publicly
+available datasets, PACS [4], VLCS [5], Office-Home [6] and
+NICO [7].
+PACS contains 7 categories of images from 4 different
+domains (Photo, Art Painting, Cartoon and Sketch). The total
+amount of images is 9,991.
+VLCS combines 10,729 real-world images of 5 classes
+from the PASCAL VOC, LabelMe, Caltech 101 and SUN09
+datasets.
+Office-Home, like PACS, is composed of images from the
+art, clipart, product and and real-world domains. The dataset
+contains 15,588 examples and 65 classes.
+NICO was recently proposed as non-iid image classification
+dataset capable of evaluating algorithms on out-of-distribution
+settings. It consists of a total of 25,000 images from 19 classes,
+10 of which are types of animals and 9 types of vehicle. NICO
+simulates real-world conditions by separating each class of
+images into contexts (e.g dog on beach, horse running, boat
+with people, etc.).
+For PACS, VLCS and Office-Home we follow the standard
+leave-one-domain-out cross-validation protocol, as described
+in [4], [87] and [88] , by holding out one domain as the test
+split and training our model on the remaining data. Similarly
+to the 3 previous datasets, for NICO we evaluate our model
+by randomly selecting 3, 5 and 7 contexts in each class
+and holding them out as a test set, simulating the leave-onedomain-out, or in this case leave-mutliple-domains-out setting.
+
+B. Baselines
+For a baseline we compare our framework with 10 other
+previous state-of-the-art methods, which utilize a ResNet-18
+and ResNet-50 as their backbone model. To demonstrate the
+effectiveness of our model we chose to evaluate against both
+multi-source and single-source DG methods. The compared
+methods are ERM [89], RSC [48], MIXUP [26], CORAL[50],
+MMD [9], SagNet [55], SelfReg [72], ARM [53], EQRM
+[59] and finally SAGM [60]. It is important to mention, that
+even though ensemble learning methods such as SIMPLE [61],
+MIRO [63], and PCL [64] provide noteworthy improvement
+in performance, they are not evaluated against our methods,
+for fair comparison. However, the proposed models could
+be included in ensemble learning frameworks for improved
+results. All the baselines are implemented and executed using
+the codebase of DomainBed [88], while the training, validation
+and test data splits remain the same across all experiments.
+The hyperparameters of each method is set as recommended
+by the authors of their respective papers. In our results, we
+present the average accuracy over 3 runs.
+
+C. Results
+Table I summarizes the results of our experiments on PACS
+and VLCS, while Table II on Office-Home and NICO. When
+compared to previously proposed DG methods, M2 -CL is able
+to set the state-of-the-art in every dataset and thus prove some
+degree of robustness in its learning and inference processes.
+In PACS, our model is able to surpass the previously
+proposed methods with both the ResNet-18 and ResNet-50
+base models. On average, our algorithm exceeds the second
+best performing models by 1.83% and about 0.5% respectively.
+With the exception of the Sketch domain in the ResNet-18
+case, the addition of the custom loss term boosts our model’s
+performance in all other domains. We believe that since the
+white background is dominant in the Sketch domain, our
+model is not able to disentangle the important attributes in
+the images.
+In the VLCS dataset, we find that our method again sets
+the state-of-the-art in all domains when adopting the ResNet18 base model and is highly competitive in the ResNet-50
+implementation, surpassing all predecessors in two out of four
+domains and achieving the second-best performance in the
+remaining two. On average, our ResNet-18 model is able to
+achieve an increase of 2.61% in accuracy, while the ResNet50 model’s performance is comparable to the top score. Once
+again, our custom loss increases the model’s accuracy in both
+cases.
+The same trend follows in Office-Home where our model
+surpasses the baselines by 3.61% and 2.47%, for the ResNet18 and ResNet-50 implementations respectively. Additionally,
+both of our models set the state-of-the-art in all of the domains.
+As far as NICO is concerned, our method continues to
+demonstrate an improvement in 2 out 3 settings over the
+baselines. With the exception of the case when 3 contexts are
+left out during the ResNet-50 training, our model consistently
+surpasses the previous algorithms in every setting. When
+leaving out 3, 5, and 7 contexts, the best ResNet-18 models
+surpass the other algorithms by a total of 1.66%, 0.87% and
+3.09% respectively, while the ResNet-50 models achieve the
+top scores when leaving out 5 (+1.76%) and 7 (+2.58%)
+contexts.
+D. Ablation Study & Sensitivity Analysis
+To justify the selection and effectiveness of the components
+in our framework, we conduct an extensive analysis and
+ablation study. Our implementation has 3 key components:
+a) the compression method in the extraction block, b) the
+reduction parameter ‘r’ and c) the Spatial Dropout layer. We
+also take into consideration d) our proposed loss function (6).
+Table III summarizes the results of our analysis on the PACS
+and VLCS datasets. The top set of parameters were also used
+for the experiments in Office-Home and NICO.
+The compression in the extraction block can be implemented either via cascading or parallel concentration
+pipelines. When adopting the cascading method, each max
+pooling layer is connected to the same 1 × 1 convolutional
+layer in the extraction block, thus creating a single pipeline.
+On the contrary, in the parallel implementation, each pooling
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+9
+
+TABLE I
+T OP -1% ACCURACY RESULTS ON THE PACS ( LEFT ) AND VLCS ( RIGHT ) DATASETS . T HE COLUMNS DENOTE THE TARGET DOMAINS . T HE TOP RESULTS
+ARE HIGHLIGHTED IN BOLD WHILE THE SECOND BEST ARE UNDERLINED .
+Method
+
+Art
+
+Cartoon
+
+Photo
+
+Sketch
+
+Avg
+
+Caltech
+
+Labelme
+
+Sun
+
+Voc
+
+Avg
+
+ResNet-18
+ERM
+RSC
+CORAL
+MIXUP
+MMD
+SagNet
+SelfReg
+ARM
+EQRM
+SAGM
+
+79.68
+78.21
+76.03
+79.19
+75.71
+77.24
+79.68
+79.21
+81.39
+79.21
+
+77.76
+74.30
+75.60
+74.09
+66.47
+77.10
+77.91
+75.74
+74.57
+77.35
+
+88.91
+92.51
+93.23
+95.36
+94.08
+93.42
+94.61
+92.82
+93.41
+94.61
+
+75.72
+78.75
+78.78
+73.95
+69.59
+73.28
+74.64
+75.09
+75.60
+79.58
+
+80.53
+80.94
+80.91
+80.65
+76.46
+80.26
+81.71
+80.71
+81.24
+82.68
+
+84.80
+88.69
+95.67
+96.20
+95.67
+89.39
+96.11
+96.64
+96.11
+96.81
+
+59.05
+62.91
+60.32
+61.77
+58.58
+61.11
+60.51
+59.88
+61.12
+60.07
+
+65.27
+68.24
+69.95
+69.76
+60.70
+68.20
+68.12
+68.10
+66.56
+69.15
+
+70.12
+68.95
+72.82
+72.93
+68.04
+73.86
+74.51
+71.31
+71.40
+73.04
+
+69.81
+72.34
+74.69
+75.17
+70.75
+73.14
+74.81
+73.98
+73.80
+74.77
+
+M 2 (Ours)
+M 2 -CL (Ours W/Loss)
+
+79.86
+81.66
+
+77.91
+78.42
+
+95.65
+97.00
+
+77.90
+77.07
+
+82.83
+83.54
+
+97.61
+98.23
+
+60.18
+63.85
+
+70.75
+72.35
+
+75.89
+76.67
+
+76.11
+77.78
+
+ResNet-50
+ERM
+RSC
+CORAL
+MIXUP
+MMD
+SagNet
+SelfReg
+ARM
+EQRM
+SAGM
+
+83.90
+81.66
+86.00
+88.00
+85.90
+85.47
+83.61
+83.22
+86.82
+85.33
+
+78.60
+80.86
+75.50
+74.30
+78.10
+80.09
+79.15
+80.01
+79.85
+80.55
+
+97.30
+96.18
+96.20
+97.20
+96.20
+94.46
+95.80
+95.13
+94.91
+95.88
+
+73.50
+75.79
+76.60
+75.30
+71.10
+77.83
+78.10
+76.75
+78.09
+80.06
+
+83.33
+83.62
+83.58
+83.70
+82.82
+84.46
+84.16
+83.78
+84.91
+85.45
+
+97.80
+95.40
+97.50
+97.90
+97.70
+97.17
+94.69
+96.55
+97.17
+97.87
+
+63.30
+64.65
+64.00
+65.50
+63.10
+64.00
+64.47
+65.16
+63.38
+64.97
+
+70.30
+70.45
+69.70
+73.30
+68.60
+70.50
+68.88
+70.18
+69.53
+70.57
+
+75.90
+73.33
+76.70
+77.80
+77.40
+73.48
+73.82
+73.63
+74.37
+76.29
+
+76.83
+75.96
+76.98
+78.62
+76.72
+76.29
+75.46
+76.38
+76.11
+77.42
+
+M 2 (Ours)
+M 2 -CL (Ours W/Loss)
+
+86.29
+87.25
+
+77.56
+81.84
+
+97.79
+98.50
+
+75.41
+76.30
+
+84.26
+85.97
+
+97.79
+98.23
+
+64.33
+65.50
+
+70.33
+72.25
+
+74.78
+77.44
+
+76.81
+78.36
+
+TABLE II
+T OP -1% ACCURACY RESULTS ON THE O FFICE -H OME ( LEFT ) AND NICO ( RIGHT ) DATASETS . F OR O FFICE -H OME , THE COLUMNS DENOTE THE TARGET
+DOMAINS . F OR NICO, THE NUMBER OF LEFT OUT CONTEXTS IS DENOTED BY N . T HE TOP RESULTS ARE HIGHLIGHTED IN BOLD WHILE THE SECOND
+BEST ARE UNDERLINED .
+Method
+
+Art
+
+Clipart
+
+Product
+
+Real-World
+
+Avg
+
+N=3
+
+N=5
+
+N=7
+
+ResNet-18
+ERM
+RSC
+CORAL
+MIXUP
+MMD
+SagNet
+SelfReg
+ARM
+EQRM
+SAGM
+
+47.88
+54.43
+53.86
+53.35
+48.86
+52.52
+54.22
+49.48
+55.67
+53.14
+
+45.64
+46.89
+46.96
+48.13
+44.67
+47.99
+48.11
+45.19
+47.85
+48.22
+
+67.34
+67.84
+68.88
+68.35
+66.83
+67.30
+68.43
+63.73
+69.76
+70.74
+
+67.52
+70.53
+71.87
+70.51
+66.37
+70.83
+71.83
+68.36
+71.29
+71.25
+
+57.10
+59.92
+60.39
+60.08
+56.68
+59.66
+60.65
+56.69
+61.14
+60.83
+
+83.77
+81.36
+84.15
+84.01
+84.33
+85.09
+86.27
+84.54
+84.93
+85.02
+
+79.53
+77.30
+79.86
+80.20
+79.23
+82.23
+83.23
+80.76
+80.81
+81.94
+
+74.53
+74.52
+76.31
+78.90
+77.38
+79.05
+81.40
+77.43
+76.32
+79.33
+
+M 2 (Ours)
+M 2 -CL (Ours W/Loss)
+
+56.91
+58.55
+
+47.77
+49.57
+
+68.33
+71.53
+
+72.21
+73.43
+
+61.29
+63.27
+
+86.02
+87.93
+
+82.81
+84.10
+
+81.64
+82.14
+
+ResNet-50
+ERM
+RSC
+CORAL
+MIXUP
+MMD
+SagNet
+SelfReg
+ARM
+EQRM
+SAGM
+
+62.30
+61.30
+64.40
+63.80
+62.20
+63.50
+60.60
+56.18
+65.15
+63.29
+
+54.10
+52.50
+55.40
+52.90
+52.70
+52.89
+53.32
+52.23
+55.49
+54.26
+
+75.30
+74.38
+76.20
+77.30
+75.50
+74.07
+72.07
+72.21
+76.89
+76.37
+
+77.40
+76.24
+78.40
+78.70
+78.10
+75.21
+76.92
+73.36
+78.25
+77.84
+
+67.27
+66.10
+68.60
+68.18
+67.13
+66.42
+65.73
+63.49
+68.94
+67.94
+
+87.02
+87.78
+87.15
+88.15
+88.38
+85.96
+86.78
+87.32
+89.55
+87.79
+
+83.66
+83.40
+84.91
+83.28
+83.69
+83.62
+85.67
+82.67
+85.92
+85.27
+
+82.04
+80.01
+83.64
+82.03
+83.04
+81.72
+84.59
+82.38
+83.07
+84.32
+
+M 2 (Ours)
+M 2 -CL (Ours W/Loss)
+
+65.36
+68.45
+
+55.55
+57.04
+
+78.15
+78.66
+
+79.50
+80.14
+
+69.64
+71.07
+
+88.78
+89.30
+
+86.88
+87.68
+
+85.84
+86.90
+
+10
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+TABLE III
+A BLATION STUDY ON KEY COMPONENTS OF OUR METHOD , WITH A R ES N ET-18 BASE MODEL , ON THE PACS AND VLCS DATASETS . W E DENOTE THE
+METHOD OF REDUCTION IN THE EXTRACTION BLOCK AS pipe (c FOR CASCADING AND p FOR PARALLEL ), THE ARBITRARY REDUCTION PARAMETER AS r
+AND THE S PATIAL D ROPOUT LAYER AS drop. A, C, P AND S CORRESPOND TO THE A RT PAINTING , C ARTOON , P HOTO AND S KETCH DOMAINS IN PACS,
+AS C, L, V AND S, DENOTE THE CALTECH 101, LABELME, SUN09 AND PASCAL VOC DATASETS IN VLCS.
+pipe
+
+r
+
+drop
+
+loss
+
+A
+
+C
+
+P
+
+S
+
+Avg
+
+C
+
+L
+
+S
+
+V
+
+Avg
+
+c
+c
+c
+c
+c
+c
+p
+p
+p
+p
+p
+p
+p
+
+2
+4
+6
+2
+4
+6
+2
+4
+6
+2
+6
+4
+4
+
+✓
+✓
+✓
+✓
+✓
+✓
+✓
+
+✓
+
+75.98
+77.50
+77.37
+76.30
+77.86
+78.13
+78.70
+76.93
+76.45
+77.37
+77.37
+79.86
+81.66
+
+73.68
+73.96
+74.09
+73.94
+74.96
+74.41
+59.59
+74.75
+73.63
+75.84
+74.83
+77.91
+78.42
+
+94.39
+94.03
+94.71
+94.75
+94.24
+94.24
+69.52
+94.42
+94.19
+87.37
+94.83
+95.65
+97.00
+
+71.27
+70.23
+73.43
+76.05
+76.51
+75.06
+64.84
+73.54
+72.59
+77.68
+76.56
+77.90
+77.07
+
+78.83
+78.93
+79.90
+80.26
+80.89
+80.46
+68.16
+79.92
+79.21
+79.56
+80.89
+82.83
+83.54
+
+96.07
+95.59
+95.91
+97.53
+96.08
+96.08
+96.57
+95.95
+95.43
+97.28
+96.21
+97.61
+98.23
+
+61.26
+59.47
+58.55
+58.87
+59.25
+60.19
+59.51
+60.16
+60.22
+59.99
+59.69
+60.18
+63.85
+
+69.05
+70.55
+69.35
+68.77
+70.47
+69.85
+69.03
+69.55
+69.73
+70.68
+69.80
+70.75
+72.35
+
+65.38
+66.34
+66.38
+66.17
+67.22
+67.91
+74.62
+65.89
+66.10
+65.90
+67.02
+75.89
+76.67
+
+72.94
+72.99
+72.55
+72.84
+66.50
+73.51
+74.93
+72.89
+72.87
+73.46
+73.18
+76.11
+77.78
+
+Fig. 6.
+Visualization of saliency maps, produced by the baseline ERM
+ResNet-18 model and our method from images in the NICO dataset. The
+magnitude of darkness in the saliency map defines the importance of each
+corresponding pixel to the predicted class, i.e. the darker the pixel, the more
+it contributes to the final prediction. The baseline ERM model tends to
+infer based on the background and spurious correlations of the object. On
+the contrary, our method focuses on the invariant features and ignores the
+entangled parts (e.g rider of the motorcycle).
+
+layer is connected to a separate conv layer, creating several
+parallel pipelines. Although the cascading pipelines have a
+slight advantage in specific domains, it is apparent that the
+parallel pipelines perform significantly better overall.
+The reduction parameter ‘r’, controls the reduction ratio of
+feature maps that will be extracted from each intermediate
+layer in the backbone network. For example, if the intermediate layer of the backbone network produces 128 feature
+maps and we set ‘r’ equal to 4, the feature maps passed to
+each concentration pipeline will be 32. As r is an arbitrary
+number, we select to experiment for values of 2, 4 and 6.
+As shown in Table 4, setting r = 4 consistently improves the
+overall performance of the model in both the PACS and VLCS
+datasets.
+The third key component in our framework is the Spatial
+
+Fig. 7.
+Visualization of saliency maps, produced by the baseline ERM
+ResNet-18 model and our method, from images in the PACS dataset. Our
+approach successfully disregards the white backgrounds in the Cartoon and
+Sketch domains, and spurious correlations in the Art Painting and Photo
+domains.
+
+Dropout layer. We added this regularization layer in order to
+account for the correlation between adjacent pixels in the reduced feature maps. Our analysis shows that the dropout layer
+indeed assists the generalization ability of our methodology, as
+it boosts its performance by 1-1.8% on average in PACS and
+1-2.5% in VLCS. Moreover, it is apparent that the addition of
+our proposed custom loss to the model proves highly effective,
+as it is able to increase its performance by a clear margin in
+every domain except Sketch.
+The proposed M2 -CL model has two hyperparameters of
+its own: τ and α. In order to research the behavior of our
+method and its sensitivity to changes in the above parameters,
+we performed additional experiments on the PACS and VLCS
+datasets. As a first step, we held α to the default value of
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+11
+
+TABLE IV
+S ENSITIVITY ANALYSIS FOR HYPERPARAMETERS τ AND α OF THE
+PROPOSED LOSS FUNCTION (E Q . 3 AND 6) IN M 2 -CL. T HE AVERAGE
+ACCURACY OF EACH MODEL ACROSS TARGET DOMAINS IS PRESENTED
+FOR THE PACS AND VLCS DATASETS . T HE BASE NETWORK FOR EACH
+DIFFERENT SETUP IS A R ES N ET-18, AS IN THE ABLATION STUDY OF
+TABLE III.
+
+τ
+
+PACS
+
+VLCS
+
+0.01
+0.1
+0.2
+0.4
+0.6
+0.8
+1.0
+1.2
+1.4
+1.6
+1.8
+2.0
+10.0
+100.0
+
+81.88
+82.20
+83.82
+85.38
+84.97
+85.30
+83.54
+84.75
+85.07
+85.41
+83.67
+82.17
+83.31
+82.04
+
+77.57
+77.48
+77.58
+75.31
+75.88
+77.71
+77.78
+77.25
+77.54
+77.80
+78.10
+77.29
+77.32
+76.69
+
+α
+
+PACS
+
+VLCS
+
+0.00
+
+82.83
+
+76.11
+
+10e-5
+
+82.35
+
+76.43
+
+10e-4
+
+83.12
+
+77.59
+
+10e-3
+
+83.54
+
+77.78
+
+10e-2
+
+80.52
+
+77.01
+
+10e-1
+
+67.26
+
+56.92
+
+0.01 and set τ in [0.1, 2.0] while also experimenting with
+extreme values, such as 0.01, 10 and 100. After analyzing
+the behavior of M2 -CL regarding τ , we followed by setting
+α in [10e − 5, 10e − 1] and keeping τ to its own default value
+of 1.0. The results of the analysis are presented in Table IV,
+which reports the average accuracy of each separate setup. The
+variation in the values of τ clearly affect the M2 -CL model,
+as its performance fluctuates between −1.66% and +1.87%
+in PACS, when compared to the presented results of Table I.
+In VLCS however, the accuracy of M 2 -CL is less sensitive to
+changes in τ , as the results do not diverge significantly from
+those of the default model. With regard to a, the results of
+the analysis were somewhat expected. When setting α to a
+value close to zero, such as 10e − 05 , the models’ accuracy
+falls back to the performance of M 2 which does not utilize
+the proposed custom loss. Contrarily, when α = 1.0 both
+learning objectives in Eq. 6 are of equal strength, which is
+not optimal for training M2 -CL. As a result, its performance
+greatly degrades, yielding even up to −20% accuracy.
+E. Qualitative Results
+To validate our assumptions and intuition regarding the
+representation extraction capabilities of our model, we choose
+to visualize the gradients of the class score function with
+respect to the input pixels of a given image, as proposed in
+[90]. By using saliency maps, one can visualize the pixels
+that affect the classification the most. The resulting figures
+illustrate that the baseline model’s predictions are strongly
+influenced by the various contexts and spurious correlations in
+the input images, while our method focuses on the invariant
+features. We select to produce saliency maps on images that
+were not in the training split in an attempt to assess the
+robustness of our approach.
+Fig 6 shows saliency maps of images in the NICO dataset.
+Evidently, the background contexts of the images (e.g sky,
+road, grass) highly contribute to ERM’s classification process, in contrast to our model. This trend also holds when
+visualizing saliency maps for images in the PACS dataset,
+
+as depicted in Fig 7. It should be noted, that each image
+is hidden from the respective model during training. Our
+method consistently classifies images based on pixels present
+in the object and is less influenced by pixels corresponding
+to domain-relevant image attributes. Interestingly enough, in
+the difficult Sketch domain, as well as in the Photo domain,
+our model emphasizes solely on the pixels constrained by and
+adjacent to the sketch and object, while paying less to none
+attention to the background. This visual evidence seems to
+confirm our intuition on the learning process of our framework.
+V. C ONCLUSIONS
+In this work, we introduce M2 ; an effective and highly
+adaptable approach to image classification in the Domain
+Generalization setting. The main idea behind our approach
+was to process potentially important information throughout
+a CNN by taking advantage of multi-scaled outputs from
+intermediate layers. To this end, we introduce an extraction
+block consisting of multiple parallel concentration pipelines
+which enables the extraction of multi-scale disentangled representations and causal features of a class. Our approach was
+empirically validated through multiple experiments as it was
+able to achieve top results in established benchmarks. To
+further push the performance of our initial model and surpass
+the state-of-the-art, we devised a novel training objective (M2 CL) tailored to our method, which enables the model to
+maximize its class-discrimination ability by producing similar
+representations along samples of the same class. Further experiments on four publicly available benchmark datasets show
+that our method achieves state-of-the-art results in most of the
+cases, while remaining highly competitive in the remaining
+settings. Through ablation studies and visual examples, we
+demonstrate the necessity of each component in our framework
+and its capability of disentangling the features of an object and
+making predictions based solely on its causal characteristics.
+Our method however, is not without drawbacks. It’s main issue
+is the additional memory overhead added by the concatenated
+feature maps before the classification head of our model.
+In addition, similarly to most contrastive losses, M2 -CL
+expects a large batch size to function as expected, adding an
+additional constraint to model training. For future work, we
+aim to work past the above limitations and perhaps incorporate
+causal inference or attention mechanisms for processing the
+disentangled representations, as well as researching additional
+similarity metrics such as KL Divergence for the distribution
+of the extracted representations.
+R EFERENCES
+[1] K. He, X. Zhang, S. Ren, and J. Sun, “Delving deep into rectifiers:
+Surpassing human-level performance on imagenet classification,” in
+Proceedings of the IEEE international conference on computer vision,
+2015, pp. 1026–1034.
+[2] B. Recht, R. Roelofs, L. Schmidt, and V. Shankar, “Do imagenet
+classifiers generalize to imagenet?” in International Conference on
+Machine Learning. PMLR, 2019, pp. 5389–5400.
+[3] K. Zhou, Z. Liu, Y. Qiao, T. Xiang, and C. C. Loy, “Domain generalization: A survey,” IEEE Transactions on Pattern Analysis and Machine
+Intelligence, 2022.
+[4] D. Li, Y. Yang, Y.-Z. Song, and T. M. Hospedales, “Deeper, broader and
+artier domain generalization,” in Proceedings of the IEEE International
+Conference on Computer Vision (ICCV), 2017, pp. 5543–5551.
+
+12
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+[5] A. Torralba and A. A. Efros, “Unbiased look at dataset bias,” in CVPR
+2011, 2011, pp. 1521–1528.
+[6] H. Venkateswara, J. Eusebio, S. Chakraborty, and S. Panchanathan,
+“Deep hashing network for unsupervised domain adaptation,” in Proceedings of the IEEE conference on computer vision and pattern
+recognition, 2017, pp. 5018–5027.
+[7] Y. He, Z. Shen, and P. Cui, “Towards non-iid image classification: A
+dataset and baselines,” Pattern Recognition, vol. 110, p. 107383, 2021.
+[8] M. Wang and W. Deng, “Deep visual domain adaptation: A survey,”
+Neurocomputing, vol. 312, pp. 135–153, 2018.
+[9] H. Li, S. J. Pan, S. Wang, and A. C. Kot, “Domain generalization with
+adversarial feature learning,” in Proceedings of the IEEE conference on
+computer vision and pattern recognition, 2018, pp. 5400–5409.
+[10] K. Muandet, D. Balduzzi, and B. Schölkopf, “Domain generalization via
+invariant feature representation,” in Proceedings of the 30th International
+Conference on Machine Learning, ser. Proceedings of Machine Learning
+Research. PMLR, 2013, pp. 10–18.
+[11] M. Long, H. Zhu, J. Wang, and M. I. Jordan, “Deep transfer learning
+with joint adaptation networks,” in Proceedings of the 34th International
+Conference on Machine Learning, ser. Proceedings of Machine Learning
+Research. PMLR, 2017, pp. 2208–2217.
+[12] ——, in Advances in Neural Information Processing Systems. Red
+Hook, NY, USA: Curran Associates, Inc.
+[13] M. Long, Y. Cao, J. Wang, and M. Jordan, “Learning transferable
+features with deep adaptation networks,” in Proceedings of the 32nd
+International Conference on Machine Learning, ser. Proceedings of
+Machine Learning Research. PMLR, 2015, pp. 97–105.
+[14] M. Chen, S. Zhao, H. Liu, and D. Cai, “Adversarial-learned loss for
+domain adaptation,” Proceedings of the AAAI Conference on Artificial
+Intelligence, pp. 3521–3528, 2020.
+[15] Y. Ganin, E. Ustinova, H. Ajakan, P. Germain, H. Larochelle, F. Laviolette, M. Marchand, and V. Lempitsky, “Domain-adversarial training of
+neural networks,” The journal of machine learning research, 2016.
+[16] E. Tzeng, J. Hoffman, K. Saenko, and T. Darrell, “Adversarial discriminative domain adaptation,” in Proceedings of the IEEE Conference on
+Computer Vision and Pattern Recognition (CVPR), 2017, pp. 7167–
+7176.
+[17] I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley,
+S. Ozair, A. Courville, and Y. Bengio, “Generative adversarial nets,” in
+Advances in Neural Information Processing Systems. Red Hook, NY,
+USA: Curran Associates, Inc., 2014, pp. 2672–2680.
+[18] B. Li, Y. Wang, S. Zhang, D. Li, K. Keutzer, T. Darrell, and H. Zhao,
+“Learning invariant representations and risks for semi-supervised domain
+adaptation,” in Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR), 2021, pp. 1104–1113.
+[19] S. Xie, Z. Zheng, L. Chen, and C. Chen, “Learning semantic representations for unsupervised domain adaptation,” in Proceedings of the
+35th International Conference on Machine Learning, ser. Proceedings
+of Machine Learning Research. PMLR, 2018, pp. 5423–5432.
+[20] C. Chen, W. Xie, W. Huang, Y. Rong, X. Ding, Y. Huang, T. Xu,
+and J. Huang, “Progressive feature alignment for unsupervised domain
+adaptation,” in Proceedings of the IEEE/CVF Conference on Computer
+Vision and Pattern Recognition (CVPR), 2019, pp. 627–636.
+[21] M. Ghifary, W. B. Kleijn, M. Zhang, D. Balduzzi, and W. Li, “Deep
+reconstruction-classification networks for unsupervised domain adaptation,” in Computer Vision – ECCV 2016. Cham: Springer International
+Publishing, 2016, pp. 597–613.
+[22] D. Li, J. Yang, K. Kreis, A. Torralba, and S. Fidler, “Semantic segmentation with generative models: Semi-supervised learning and strong outof-domain generalization,” in Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition (CVPR), 2021, pp. 8300–
+8311.
+[23] J. Tompson, R. Goroshin, A. Jain, Y. LeCun, and C. Bregler, “Efficient
+object localization using convolutional networks,” in Proceedings of the
+IEEE Conference on Computer Vision and Pattern Recognition (CVPR),
+June 2015, pp. 648–656.
+[24] K. Saito, Y. Ushiku, T. Harada, and K. Saenko, “Adversarial dropout
+regularization,” 2018.
+[25] Y. Balaji, S. Sankaranarayanan, and R. Chellappa, “MetaReg: Towards
+Domain Generalization using Meta-Regularization,” in Advances in
+Neural Information Processing Systems, vol. 31. Red Hook, NY, USA:
+Curran Associates, Inc., 2018, pp. 1006–1016.
+[26] S. Yan, H. Song, N. Li, L. Zou, and L. Ren, “Improve unsupervised domain adaptation with mixup training,” arXiv preprint arXiv:2001.00677,
+2020.
+[27] G. French, M. Mackiewicz, and M. Fisher, “Self-ensembling for visual
+domain adaptation,” 2018.
+
+[28] Y. Bengio, A. Courville, and P. Vincent, “Representation learning: A
+review and new perspectives,” IEEE Transactions on Pattern Analysis
+and Machine Intelligence, 2013.
+[29] B. Schölkopf, F. Locatello, S. Bauer, N. R. Ke, N. Kalchbrenner,
+A. Goyal, and Y. Bengio, “Toward causal representation learning,”
+Proceedings of the IEEE, 2021.
+[30] D. P. Kingma and M. Welling, “Auto-encoding variational bayes,” 2014.
+[31] C. P. Burgess, I. Higgins, A. Pal, L. Matthey, N. Watters, G. Desjardins, and A. Lerchner, “Understanding disentangling in β−VAE,”
+arXiv:1804.03599 [cs, stat], 2018.
+[32] X. Chen, Y. Duan, R. Houthooft, J. Schulman, I. Sutskever, and
+P. Abbeel, “Infogan: Interpretable representation learning by information
+maximizing generative adversarial nets,” in Advances in Neural Information Processing Systems. Red Hook, NY, USA: Curran Associates,
+Inc., 2016.
+[33] J. Chen, Z. Zhang, X. Xie, Y. Li, T. Xu, K. Ma, and Y. Zheng,
+“Beyond mutual information: Generative adversarial network for domain
+adaptation using information bottleneck constraint,” IEEE Transactions
+on Medical Imaging, 2021.
+[34] H. Kim and A. Mnih, “Disentangling by factorising,” in Proceedings of
+the 35th International Conference on Machine Learning, ser. Proceedings of Machine Learning Research. PMLR, 2018, pp. 2649–2658.
+[35] M. Yang, F. Liu, Z. Chen, X. Shen, J. Hao, and J. Wang, “Causalvae:
+Disentangled representation learning via neural structural causal models,” in Proceedings of the IEEE/CVF Conference on Computer Vision
+and Pattern Recognition (CVPR), 2021, pp. 9593–9602.
+[36] A. v. d. Oord, Y. Li, and O. Vinyals, “Representation learning with
+contrastive predictive coding,” arXiv preprint arXiv:1807.03748, 2018.
+[37] T. Chen, S. Kornblith, M. Norouzi, and G. Hinton, “A simple framework
+for contrastive learning of visual representations,” in International
+conference on machine learning. PMLR, 2020, pp. 1597–1607.
+[38] K. He, H. Fan, Y. Wu, S. Xie, and R. Girshick, “Momentum contrast
+for unsupervised visual representation learning,” in Proceedings of the
+IEEE/CVF conference on computer vision and pattern recognition, 2020,
+pp. 9729–9738.
+[39] J.-B. Grill, F. Strub, F. Altché, C. Tallec, P. Richemond, E. Buchatskaya,
+C. Doersch, B. Avila Pires, Z. Guo, M. Gheshlaghi Azar et al.,
+“Bootstrap your own latent-a new approach to self-supervised learning,”
+Advances in neural information processing systems, vol. 33, pp. 21 271–
+21 284, 2020.
+[40] X. Chen and K. He, “Exploring simple siamese representation learning,”
+in Proceedings of the IEEE/CVF conference on computer vision and
+pattern recognition, 2021, pp. 15 750–15 758.
+[41] X.-S. Wei, Y.-Z. Song, O. Mac Aodha, J. Wu, Y. Peng, J. Tang, J. Yang,
+and S. Belongie, “Fine-grained image analysis with deep learning: A
+survey,” IEEE transactions on pattern analysis and machine intelligence,
+vol. 44, no. 12, pp. 8927–8948, 2021.
+[42] Y. Wang, V. I. Morariu, and L. S. Davis, “Learning a discriminative
+filter bank within a cnn for fine-grained recognition,” in Proceedings of
+the IEEE conference on computer vision and pattern recognition, 2018,
+pp. 4148–4157.
+[43] Y. Ding, Y. Zhou, Y. Zhu, Q. Ye, and J. Jiao, “Selective sparse sampling
+for fine-grained image recognition,” in Proceedings of the IEEE/CVF
+International Conference on Computer Vision, 2019, pp. 6599–6608.
+[44] Z. Huang and Y. Li, “Interpretable and accurate fine-grained recognition
+via region grouping,” in Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, 2020, pp. 8662–8672.
+[45] H. Zheng, J. Fu, Z.-J. Zha, and J. Luo, “Looking for the devil in the
+details: Learning trilinear attention sampling network for fine-grained
+image recognition,” in Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, 2019, pp. 5012–5021.
+[46] R. Ji, L. Wen, L. Zhang, D. Du, Y. Wu, C. Zhao, X. Liu, and
+F. Huang, “Attention convolutional binary neural tree for fine-grained
+visual categorization,” in Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, 2020, pp. 10 468–10 477.
+[47] X. Zhang, P. Cui, R. Xu, L. Zhou, Y. He, and Z. Shen, “Deep stable
+learning for out-of-distribution generalization,” in Proceedings of the
+IEEE/CVF Conference on Computer Vision and Pattern Recognition
+(CVPR), 2021, pp. 5372–5382.
+[48] Z. Huang, H. Wang, E. P. Xing, and D. Huang, “Self-challenging
+improves cross-domain generalization,” in ECCV, 2020, pp. 124–140.
+[49] F. M. Carlucci, A. D’Innocente, S. Bucci, B. Caputo, and T. Tommasi,
+“Domain generalization by solving jigsaw puzzles,” in Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern Recognition
+(CVPR), 2019, pp. 2229–2238.
+
+BALLAS et al.: M 2 -CL FOR DOMAIN GENERALIZATION
+
+[50] B. Sun and K. Saenko, “Deep coral: Correlation alignment for deep
+domain adaptation,” in European conference on computer vision. Berlin,
+Heidelberg: Springer, 2016, pp. 443–450.
+[51] D. Li, Y. Yang, Y.-Z. Song, and T. M. Hospedales, “Learning to
+generalize: Meta-learning for domain generalization,” in Thirty-Second
+AAAI Conference on Artificial Intelligence, 2018, pp. 3490–3497.
+[52] C. Finn, P. Abbeel, and S. Levine, “Model-agnostic meta-learning
+for fast adaptation of deep networks,” in Proceedings of the 34th
+International Conference on Machine Learning, ser. Proceedings of
+Machine Learning Research. PMLR, 2017, pp. 1126–1135.
+[53] M. Zhang, H. Marklund, N. Dhawan, A. Gupta, S. Levine, and C. Finn,
+“Adaptive risk minimization: Learning to adapt to domain shift,” Advances in Neural Information Processing Systems, vol. 34, pp. 23 664–
+23 678, 2021.
+[54] Y. Du, J. Xu, H. Xiong, Q. Qiu, X. Zhen, C. G. M. Snoek, and L. Shao,
+“Learning to learn with variational information bottleneck for domain
+generalization,” in Computer Vision – ECCV 2020. Cham: Springer
+International Publishing, 2020, pp. 200–216.
+[55] H. Nam, H. Lee, J. Park, W. Yoon, and D. Yoo, “Reducing domain gap
+by reducing style bias,” in Proceedings of the IEEE/CVF Conference on
+Computer Vision and Pattern Recognition, 2021, pp. 8690–8699.
+[56] S. Seo, Y. Suh, D. Kim, G. Kim, J. Han, and B. Han, “Learning
+to optimize domain specific normalization for domain generalization,”
+in Computer Vision – ECCV 2020.
+Cham: Springer International
+Publishing, 2020, pp. 68–83.
+[57] A. Ballas and C. Diou, “CNN Feature Map Augmentation for SingleSource Domain Generalization,” in 2023 IEEE Ninth International
+Conference on Big Data Computing Service and Applications (BigDataService). Los Alamitos, CA, USA: IEEE Computer Society, Jul.
+2023, pp. 127–131.
+[58] K. Zhou, Y. Yang, Y. Qiao, and T. Xiang, “Domain generalization with
+mixstyle,” in International Conference on Learning Representations,
+2021.
+[59] C. Eastwood, A. Robey, S. Singh, J. Von Kügelgen, H. Hassani, G. J.
+Pappas, and B. Schölkopf, “Probable domain generalization via quantile
+risk minimization,” Advances in Neural Information Processing Systems,
+vol. 35, pp. 17 340–17 358, 2022.
+[60] P. Wang, Z. Zhang, Z. Lei, and L. Zhang, “Sharpness-aware gradient
+matching for domain generalization,” in Proceedings of the IEEE/CVF
+Conference on Computer Vision and Pattern Recognition, 2023, pp.
+3769–3778.
+[61] Z. Li, K. Ren, X. JIANG, Y. Shen, H. Zhang, and D. Li, “SIMPLE:
+Specialized model-sample matching for domain generalization,” in The
+Eleventh International Conference on Learning Representations, 2023.
+[62] J. Cha, S. Chun, K. Lee, H.-C. Cho, S. Park, Y. Lee, and S. Park,
+“SWAD: Domain Generalization by Seeking Flat Minima,” in Advances
+in Neural Information Processing Systems, M. Ranzato, A. Beygelzimer,
+Y. Dauphin, P. S. Liang, and J. W. Vaughan, Eds., vol. 34. Red Hook,
+NY, USA: Curran Associates, Inc., 2021, pp. 22 405–22 418.
+[63] J. Cha, K. Lee, S. Park, and S. Chun, “Domain Generalization by
+Mutual-Information Regularization with Pre-trained Models,” in Computer Vision – ECCV 2022, S. Avidan, G. Brostow, M. Cissé, G. M.
+Farinella, and T. Hassner, Eds. Cham: Springer Nature Switzerland,
+2022, vol. 13683, pp. 440–457, series Title: Lecture Notes in Computer
+Science.
+[64] X. Yao, Y. Bai, X. Zhang, Y. Zhang, Q. Sun, R. Chen, R. Li, and B. Yu,
+“PCL: Proxy-based Contrastive Learning for Domain Generalization,” in
+2022 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). New Orleans, LA, USA: IEEE, Jun. 2022, pp. 7087–7097.
+[65] B. Hariharan, P. Arbelaez, R. Girshick, and J. Malik, “Hypercolumns
+for object segmentation and fine-grained localization,” in Proceedings
+of the IEEE Conference on Computer Vision and Pattern Recognition
+(CVPR), 2015.
+[66] A. Ballas and C. Diou, “Multi-layer representation learning for robust
+ood image classification,” in Proceedings of the 12th Hellenic Conference on Artificial Intelligence, ser. SETN ’22. New York, NY, USA:
+Association for Computing Machinery, 2022, pp. 1–4.
+[67] O. Ronneberger, P. Fischer, and T. Brox, “U-Net: Convolutional Networks for Biomedical Image Segmentation,” in Medical Image Computing and Computer-Assisted Intervention – MICCAI 2015, ser. Lecture
+Notes in Computer Science, N. Navab, J. Hornegger, W. M. Wells, and
+A. F. Frangi, Eds. Cham: Springer International Publishing, 2015, pp.
+234–241.
+[68] A. Ballas and C. Diou, “Towards domain generalization for ecg and
+eeg classification: Algorithms and benchmarks,” IEEE Transactions on
+Emerging Topics in Computational Intelligence, pp. 1–11, 2023.
+
+13
+
+[69] G. Huang, Z. Liu, L. Van Der Maaten, and K. Q. Weinberger, “Densely
+Connected Convolutional Networks,” in 2017 IEEE Conference on
+Computer Vision and Pattern Recognition (CVPR). Honolulu, HI: IEEE,
+Jul. 2017, pp. 2261–2269.
+[70] L. Zhang, J. Song, A. Gao, J. Chen, C. Bao, and K. Ma, “Be Your Own
+Teacher: Improve the Performance of Convolutional Neural Networks
+via Self Distillation,” in 2019 IEEE/CVF International Conference on
+Computer Vision (ICCV). Seoul, Korea (South): IEEE, Oct. 2019, pp.
+3712–3721.
+[71] Y. Wang, Z. Ni, S. Song, L. Yang, and G. Huang, “Revisiting locally supervised learning: an alternative to end-to-end training,” in International
+Conference on Learning Representations, 2021.
+[72] D. Kim, Y. Yoo, S. Park, J. Kim, and J. Lee, “SelfReg: Selfsupervised Contrastive Regularization for Domain Generalization,” in
+2021 IEEE/CVF International Conference on Computer Vision (ICCV).
+Montreal, QC, Canada: IEEE, Oct. 2021, pp. 9599–9608.
+[73] A. Ballas and C. Diou, “CNNs with Multi-Level Attention for Domain
+Generalization,” in Proceedings of the 2023 ACM International Conference on Multimedia Retrieval, ser. ICMR ’23. New York, NY, USA:
+Association for Computing Machinery, 2023, pp. 592–596, event-place:
+Thessaloniki, Greece.
+[74] C. Olah, A. Mordvintsev, and L. Schubert, “Feature visualization,”
+Distill, 2017, https://distill.pub/2017/feature-visualization.
+[75] C. Olah, A. Satyanarayan, I. Johnson, S. Carter, L. Schubert, K. Ye, and
+A. Mordvintsev, “The building blocks of interpretability,” Distill, vol. 3,
+no. 3, p. e10, 2018.
+[76] R. Geirhos, J.-H. Jacobsen, C. Michaelis, R. Zemel, W. Brendel,
+M. Bethge, and F. A. Wichmann, “Shortcut learning in deep neural
+networks,” Nature Machine Intelligence, vol. 2, no. 11, pp. 665–673,
+2020.
+[77] N. Cohen, O. Sharir, and A. Shashua, “On the expressive power of deep
+learning: A tensor analysis,” in Conference on learning theory. PMLR,
+2016, pp. 698–728.
+[78] N. Cohen and A. Shashua, “Inductive bias of deep convolutional
+networks through pooling geometry,” in International Conference on
+Learning Representations, 2017.
+[79] Y. Levine, D. Yakira, N. Cohen, and A. Shashua, “Deep learning and
+quantum entanglement: Fundamental connections with implications to
+network design,” in International Conference on Learning Representations, 2018.
+[80] I. Higgins, D. Amos, D. Pfau, S. Racaniere, L. Matthey, D. Rezende,
+and A. Lerchner, “Towards a definition of disentangled representations,”
+arXiv preprint arXiv:1812.02230, 2018.
+[81] B. R. Wilfred, W.-X. Wang, and P. T. Nelson, “Energizing mirna
+research: a review of the role of mirnas in lipid metabolism, with
+a prediction that mir-103/107 regulates human metabolic pathways,”
+Molecular genetics and metabolism, vol. 91, no. 3, pp. 209–217, 2007.
+[82] Z. Wu, Y. Xiong, S. X. Yu, and D. Lin, “Unsupervised feature learning
+via non-parametric instance discrimination,” in Proceedings of the IEEE
+conference on computer vision and pattern recognition, 2018, pp. 3733–
+3742.
+[83] G. Hinton, O. Vinyals, and J. Dean, “Distilling the knowledge in a neural
+network,” arXiv preprint arXiv:1503.02531, 2015.
+[84] K. He, X. Zhang, S. Ren, and J. Sun, “Deep residual learning for image
+recognition,” in Proceedings of the IEEE Conference on Computer Vision
+and Pattern Recognition (CVPR), June 2016, pp. 770–778.
+[85] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan,
+T. Killeen, Z. Lin, N. Gimelshein, L. Antiga, A. Desmaison, A. Kopf,
+E. Yang, Z. DeVito, M. Raison, A. Tejani, S. Chilamkurthy, B. Steiner,
+L. Fang, J. Bai, and S. Chintala, “Pytorch: An imperative style, highperformance deep learning library,” in Advances in Neural Information
+Processing Systems 32. Red Hook, NY, USA: Curran Associates, Inc.,
+2019, pp. 8026–8037.
+[86] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,”
+arXiv preprint arXiv:1711.05101, 2017.
+[87] M. Ghifary, W. B. Kleijn, M. Zhang, and D. Balduzzi, “Domain
+generalization for object recognition with multi-task autoencoders,” in
+Proceedings of the IEEE International Conference on Computer Vision
+(ICCV), 2015, pp. 2551–2559.
+[88] I. Gulrajani and D. Lopez-Paz, “In search of lost domain generalization,”
+in International Conference on Learning Representations, 2021.
+[89] V. Vapnik, The nature of statistical learning theory. Berlin, Heidelberg:
+Springer science & business media, 1999.
+[90] K. Simonyan, A. Vedaldi, and A. Zisserman, “Deep inside convolutional
+networks: Visualising image classification models and saliency maps,” in
+2nd International Conference on Learning Representations, ICLR 2014,
+
+14
+
+MANUSCRIPT ACCEPTED IN IEEE TRANSACTIONS ON ARTIFICIAL INTELLIGENCE, MARCH 2024
+
+Banff, AB, Canada, April 14-16, 2014, Workshop Track Proceedings,
+Y. Bengio and Y. LeCun, Eds., 2014.
+Aristotelis Ballas is currently working toward the
+Ph.D. degree in computer science with the Department of Informatics and Telematics, Harokopio
+University of Athens, Greece. His research interests
+include machine learning and representation learning, with an emphasis on domain generalization and
+AI in healthcare.
+
+Christos Diou Member, IEEE, is an Assistant Professor of Artificial Intelligence and Machine Learning at the Department of Informatics and Telematics,
+Harokopio University of Athens. He received his
+Diploma in Electrical and Computer Engineering
+and his PhD in Analysis of Multimedia with Machine Learning from the Aristotle University of
+Thessaloniki. He has co-authored over 80 publications in international scientific journals and conferences and is the co-inventor in 1 patent. His recent
+research interests include robust machine learning
+algorithms that generalize well, the interpretability of machine learning
+models, as well as the development of machine learning models for the
+estimation of causal effects from observational data. He has over 15 years of
+experience participating and leading European and national research projects,
+focusing on applications of artificial intelligence in healthcare.
+
+
