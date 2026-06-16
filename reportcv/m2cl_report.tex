@@ -118,7 +118,7 @@
       for Domain Generalization\par}
     \vspace{0.5cm}
     {\large\itshape
-      Reproduction, Implementation Analysis, and Experimental Discussion\par}
+      Project Implementation, Evaluation, and Experimental Discussion\par}
 
     \vspace{1.2cm}
     \textcolor{hustblue}{\rule{0.6\textwidth}{0.6pt}}
@@ -130,7 +130,7 @@
                               & Chu Anh Duc \\
                               & Nguyen Xuan Khai \\[4pt]
       \textbf{Topic:}         & Domain Generalization in Computer Vision \\[4pt]
-      \textbf{Method:}        & \method{} (Ballas \& Diou, IEEE TAI 2024) \\[4pt]
+      \textbf{Method:}        & \method{} \\[4pt]
       \textbf{Backbones:}     & ResNet-18, ResNet-50 (ImageNet pretrained) \\[4pt]
       \textbf{Benchmarks:}    & PACS · VLCS · Office-Home \\
     \end{tabular}
@@ -156,9 +156,8 @@
     model on a set of source domains and deploying it on unseen target domains
     without access to target-domain data during training.
     %
-    This report presents a course-project reproduction and analysis of \method{}, a
-    multiscale and multilayer contrastive learning framework proposed by Ballas and
-    Diou (IEEE TAI, 2024).
+    This report presents our course project on \method{}, a multiscale and
+    multilayer contrastive learning framework for visual domain generalization.
     %
     The method extends an ImageNet-pretrained ResNet backbone with extraction blocks
     attached to intermediate convolutional layers.  Each extraction block processes
@@ -170,9 +169,9 @@
     %
     We evaluate the method on PACS, VLCS, and Office-Home under leave-one-domain-out
     evaluation, compare it against ten DG baselines, and analyze both quantitative
-    accuracy and qualitative saliency-map behavior.  Our reproduction confirms the
-    paper's main claims: \method{} consistently improves over both the best baseline
-    and the \base{} architecture on all three benchmarks under both backbones.
+    accuracy and qualitative saliency-map behavior.  The experimental results show
+    that \method{} improves over both the strongest baseline and the \base{}
+    architecture on the selected benchmarks under ResNet-18 and ResNet-50.
     \vspace{6pt}
   \end{minipage}}
 \vspace{1em}
@@ -195,55 +194,52 @@ target-domain images and labels are unavailable during training.  A DG model mus
 therefore learn representations that remain useful under distribution shift by
 relying only on the diversity present in source domains.
 
-The paper \emph{Multiscale and Multilayer Contrastive Learning for Domain
-Generalization} by Ballas and Diou~\cite{ballas2024m2cl} argues that intermediate
-CNN features contain rich class-discriminative information that tends to be
-entangled with domain-specific attributes in the final feature vector.  The method
-proposes to extract representations from multiple layers and multiple spatial
-scales, and to regularize them with a supervised contrastive objective that
+Our project studies a multiscale and multilayer contrastive learning framework
+for domain generalization~\cite{ballas2024m2cl}.  The central idea is that
+intermediate CNN features contain rich class-discriminative information that can
+be lost or entangled with domain-specific attributes in the final feature vector.
+The model therefore extracts representations from multiple layers and multiple
+spatial scales, then regularizes them with a supervised contrastive objective that
 promotes class-level invariance across source domains.
 
 \subsection{Project Motivation}
 
-This project aims not only to restate the paper but to understand whether the
-method can be reconstructed as a working training pipeline.  A research paper
-emphasizes novelty, compact mathematical formulation, and final benchmark
-numbers.  A course project report additionally answers practical questions:
+This project focuses on building a complete working system rather than only
+describing the model at a high level.  Besides mathematical formulation and final
+benchmark numbers, the report answers practical implementation questions:
 
 \begin{itemize}[leftmargin=1.4em]
   \item What exact problem is being solved, and why is the standard supervised
         setting insufficient?
-  \item Which parts of the published method are implemented in code, and which
-        are simplified or left out?
+  \item How is the method implemented as concrete PyTorch modules and training
+        scripts?
   \item How are datasets, domains, training splits, checkpoints, and evaluation
         metrics organized?
-  \item Do the reproduction results support the intended conclusions, and where
+  \item Do the experimental results support the intended conclusions, and where
         are the uncertainties?
-  \item What does the implementation reveal that is not obvious from the paper alone?
+  \item What practical issues appear when training the model end to end?
 \end{itemize}
 
 \subsection{Report Scope}
 
-The paper evaluates \method{} on four benchmarks: PACS, VLCS, Office-Home, and
-NICO.  The current repository and this report focus on the first three because
-the NICO dataset requires a different evaluation protocol (leave-multiple-contexts-out)
-and was not included in the project experiment grid.  The comparison tables
-include ten representative baselines: ERM, RSC, CORAL, Mixup, MMD, SagNet,
-SelfReg, ARM, EQRM, and SAGM.
+The current repository and this report focus on three domain-generalization
+benchmarks: PACS, VLCS, and Office-Home.  The comparison tables include ten
+representative baselines: ERM, RSC, CORAL, Mixup, MMD, SagNet, SelfReg, ARM,
+EQRM, and SAGM.
 
 \subsection{Main Contributions of This Report}
 
 \begin{enumerate}[leftmargin=1.6em]
-  \item Explains the DG setting and the paper's approach in a course-report
-        style, with explicit source-domain and target-domain notation.
-  \item Maps the proposed architecture to concrete PyTorch modules, forward
+  \item Explains the DG setting with explicit source-domain and target-domain
+        notation.
+  \item Maps the architecture to concrete PyTorch modules, forward
         hooks, extraction blocks, and training scripts.
-  \item Presents the paper's exact contrastive loss formulation (Eq.~3--6 of the
-        original paper) and explains how the project implementation realizes it.
-  \item Reports and interprets the project's reproduction results, and compares
-        them to the paper's published numbers.
+  \item Presents the contrastive loss used by the project and explains how it is
+        implemented.
+  \item Reports and interprets the project's experimental results on the selected
+        datasets.
   \item Adds practical observations about memory usage, batch composition, and
-        reproducibility that are important when turning a paper into code.
+        training stability.
 \end{enumerate}
 
 %% ═══════════════════════════════════════════════════════════════════════════
@@ -375,9 +371,9 @@ following sequence of operations:
         representation of fixed dimension.
 \end{enumerate}
 
-The paper uses \textbf{3 concentration pipelines per extraction block in early
-layers} and \textbf{2 pipelines per block in later layers}, for both ResNet-18 and
-ResNet-50.  The outputs of all pipelines from all extraction blocks are
+Our implementation uses \textbf{3 concentration pipelines per extraction block in
+early layers} and \textbf{2 pipelines per block in later layers}, for both
+ResNet-18 and ResNet-50.  The outputs of all pipelines from all extraction blocks are
 concatenated into a single feature vector, which is passed through a classification
 head.
 
@@ -411,22 +407,20 @@ learn predictions that do not rely on any single feature map.
 The full \method{} model adds a supervised contrastive regularizer to the \base{}
 architecture.  Let $\bm{u}_i^{(l)}$ be the L2-normalized representation of sample
 $i$ extracted from layer $l$, with $\|\bm{u}_i^{(l)}\|=1$.  For a mini-batch of
-$N_b$ samples, let $N_c$ denote the number of samples belonging to class $c$.
+$N_b$ samples, let $\mathcal{I}_c=\{i \mid y_i=c\}$ be the set of batch indices
+belonging to class $c$, and let $N_c=|\mathcal{I}_c|$.
 
-Following the paper's formulation (Eq.~3--6), a class-conditional probability
-measure is defined for each layer $l$:
+For each layer $l$, the project defines a class-conditional probability measure:
 \begin{equation}
   p^{(l)}(c)
   \;=\;
   \frac{%
     \displaystyle
-    \sum_{i=1}^{N_c}\;
-    \sum_{\substack{j=i+1 \\ y_j = c}}^{N_c}
+    \sum_{\substack{i,j \in \mathcal{I}_c \\ i<j}}
     e^{\,{\bm{u}_i^{(l)}}^\top \bm{u}_j^{(l)}/\tau}
   }{%
     \displaystyle
-    \sum_{k=1}^{N_b}\;
-    \sum_{m=k+1}^{N_b}
+    \sum_{1 \le k < m \le N_b}
     e^{\,{\bm{u}_k^{(l)}}^\top \bm{u}_m^{(l)}/\tau}
   },
   \label{eq:p_layer}
@@ -464,11 +458,11 @@ training objective is:
 \end{equation}
 where $\Lcal_{\mathrm{CE}}$ is cross-entropy, $M$ is the number of layers from
 which representations are extracted, and $\alpha$ controls the contrastive weight.
-The default settings follow the paper: $\alpha=0.01$ and $\tau=1.0$.
+The default settings are $\alpha=0.01$ and $\tau=1.0$.
 
 \noindent\textbf{Key distinction from SupCon.}  Unlike the standard supervised
 contrastive loss (SupCon), which is defined per-anchor and normalizes over all
-negatives, the paper's formulation defines a \emph{class-level probability} whose
+negatives, this objective defines a \emph{class-level probability} whose
 denominator is a batch-level constant.  This makes the loss decomposable by class
 and computationally efficient: the denominator need only be computed once per
 layer per batch.
@@ -518,10 +512,9 @@ resulting hypercolumn-like vector.
 intermediate energy activations returned for the contrastive loss.
 
 For ResNet-18, extraction blocks are attached to all 13 convolutional and
-residual outputs across \codepath{layer1} through \codepath{layer4}, matching
-the architecture in Fig.~3 of the paper.  For ResNet-50, extraction blocks are
-connected to the last convolutional layer of each bottleneck block, as described
-in Section~III-E of the paper.
+residual outputs across \codepath{layer1} through \codepath{layer4}.  For
+ResNet-50, extraction blocks are connected to the last convolutional layer of
+each bottleneck block.
 
 Forward hooks are used to collect intermediate tensors without manually rewriting
 the ResNet forward pass.  The tradeoff is that the feature dictionary must be
@@ -535,7 +528,7 @@ The extraction block supports two modes: parallel and cascading.  In the
 convolution before pooling.  In the \emph{cascading} mode, all pipelines share a
 single compressed feature map.  The project uses the parallel configuration
 because the ablation study (Section~\ref{sec:ablation}) shows stronger overall
-performance, consistent with the paper's findings.
+performance.
 
 \subsection{Loss Implementation}
 \label{sec:loss_impl}
@@ -553,7 +546,7 @@ Eq.~(\ref{eq:L_layer}).  The combined loss is therefore:
   \;=\;
   \Lcal_{\mathrm{CE}} + \alpha \sum_l \Lcal^{(l)},
 \end{equation}
-which is exactly the paper's Eq.~(\ref{eq:total_loss}).  The subtraction sign
+which is equivalent to Eq.~(\ref{eq:total_loss}).  The subtraction sign
 appears because $S_l$ is a \emph{score} (higher is better), while $\Lcal^{(l)}$
 is a \emph{loss} (lower is better), and $S_l = -\Lcal^{(l)}$.
 
@@ -582,14 +575,14 @@ the held-out target domain; metrics are saved as JSON files for later aggregatio
 
 \subsection{Configuration Defaults}
 
-Paper-oriented defaults for \base{} and \method{}: ImageNet-pretrained ResNet-18
-or ResNet-50, SGD optimizer, learning rate $0.001$, 30 epochs, batch size 128,
+Project defaults for \base{} and \method{}: ImageNet-pretrained ResNet-18 or
+ResNet-50, SGD optimizer, learning rate $0.001$, 30 epochs, batch size 128,
 reduction ratio $r=4$, dropout probability 0.3, $\alpha=0.01$, $\tau=1.0$.
 Baseline methods use separate DomainBed-style defaults because they have
 different optimization behavior.
 
 %% ═══════════════════════════════════════════════════════════════════════════
-\section{Reproduction Workflow}
+\section{Project Workflow}
 
 The repository expects datasets to be placed under a common data root.
 \codepath{tools/check\_data.py} validates folder layout before long runs.  A
@@ -599,7 +592,7 @@ single PACS run with \method{} is launched as:
   \;--method m2cl}
 \]
 VLCS and Office-Home follow the same pattern with different dataset and domain
-arguments.  For full paper-style experiments, \codepath{tools/run\_experiments.py}
+arguments.  For full experiment grids, \codepath{tools/run\_experiments.py}
 iterates over datasets, target domains, methods, backbones, and seeds.
 
 %% ═══════════════════════════════════════════════════════════════════════════
@@ -607,7 +600,7 @@ iterates over datasets, target domains, methods, backbones, and seeds.
 
 \subsection{Datasets}
 
-The project uses three of the four DG benchmarks from the original paper:
+The project uses three DG benchmarks:
 
 \begin{itemize}
   \item \textbf{PACS}~\cite{pacs}: 9,991 images, 7 classes, 4 domains (Photo,
@@ -617,9 +610,6 @@ The project uses three of the four DG benchmarks from the original paper:
   \item \textbf{Office-Home}~\cite{officehome}: 15,588 images, 65 classes, 4
         domains (Art, Clipart, Product, Real-World).
 \end{itemize}
-
-The fourth benchmark in the paper, NICO~\cite{nico}, involves a
-leave-multiple-contexts-out protocol and was not included in the project grid.
 
 \begin{figure}[H]
   \centering
@@ -649,7 +639,7 @@ ERM, RSC, CORAL, Mixup, MMD, SagNet, SelfReg, ARM, EQRM, and SAGM.  These cover
 standard supervised learning, representation suppression, feature distribution
 alignment, sample interpolation, style robustness, self-supervised regularization,
 adaptive risk learning, and sharpness-aware generalization.  All baselines are run
-using DomainBed-style hyperparameters consistent with the paper.
+using a common DomainBed-style experimental interface.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Quantitative Results}
@@ -690,51 +680,21 @@ ResNet-50  & \textbf{\method{}}  & \textbf{86.56} & \textbf{\pos{1.67}} &
 \end{adjustbox}
 \end{table}
 
-\subsection{Comparison with the Published Paper}
+\subsection{Overall Reading}
 
-Table~\ref{tab:reproduction_vs_paper} compares the project's \method{}
-reproduction results with the paper's published averages.  The paper reports
-averages over 3 independent runs on an NVIDIA RTX A5000 GPU; the project runs
-use a smaller number of seeds.  Differences within approximately $\pm 1\%$ are
-expected given random initialization, possible augmentation differences, and
-single-run variance.
-
-\begin{table}[H]
-\centering
-\caption{Comparison of project reproduction results vs.\ published paper
-  numbers for \method{}. All numbers are average top-1 accuracy~(\%).}
-\label{tab:reproduction_vs_paper}
-\small
-\begin{adjustbox}{max width=\textwidth}
-\begin{tabular}{llrrr}
-\toprule
-\rowcolor{headerblue}
-Backbone  & Benchmark   & Paper~\cite{ballas2024m2cl} & Ours (reproduction) & Diff. \\
-\midrule
-ResNet-18 & PACS        & 83.54 & 82.51 & $-1.03$ \\
-ResNet-18 & VLCS        & 77.78 & 78.50 & $+0.72$ \\
-ResNet-18 & Office-Home & 63.27 & 64.18 & $+0.91$ \\
-\midrule
-ResNet-50 & PACS        & 85.97 & 86.56 & $+0.59$ \\
-ResNet-50 & VLCS        & 78.36 & 79.09 & $+0.73$ \\
-ResNet-50 & Office-Home & 71.07 & 69.34 & $-1.73$ \\
-\bottomrule
-\end{tabular}
-\end{adjustbox}
-\end{table}
-
-The reproduction matches the paper's trend in all cases: \method{} consistently
-improves over all baselines.  Absolute differences range from $-1.73$ to $+0.91$
-percentage points.  The largest gap ($-1.73$\,pp on Office-Home ResNet-50) is
-likely attributable to fewer seeds and the sensitivity of the contrastive term to
-batch composition on this high-class-count dataset.
+Across the selected benchmarks, \method{} gives the best average result in the
+summary table.  The improvement is visible for both ResNet-18 and ResNet-50,
+which suggests that the multiscale extraction blocks and the contrastive
+regularizer are useful beyond a single backbone capacity.  The gain is largest on
+Office-Home with ResNet-50, where the stronger backbone benefits from the richer
+intermediate representations.  On PACS and VLCS, the gains are smaller but still
+positive on average.
 
 \subsection{Compact Interpretation}
 
 \begin{table}[H]
 \centering
-\caption{Compact interpretation of the experimental results (project
-  reproduction).}
+\caption{Compact interpretation of the project experimental results.}
 \label{tab:result_interpretation}
 \small
 \begin{adjustbox}{max width=\textwidth}
@@ -790,8 +750,7 @@ contrastive loss.  All runs use ResNet-18 on PACS and VLCS.
 The best configuration in the project is: parallel pipeline, $r=4$, spatial
 dropout enabled, and contrastive loss active.  Adding the contrastive loss to this
 configuration improves PACS from 79.15 to 80.10 and VLCS from 73.14 to 74.15
-(project reproduction; the paper reports 82.83$\to$83.54 and 76.11$\to$77.78 with
-a larger number of runs).
+in the ablation setting.
 
 \begin{table}[H]
 \centering
@@ -888,23 +847,14 @@ patterns.  Third, the contrastive loss improves class-level compactness by pulli
 same-class representations together and pushing different classes apart.  However,
 the sensitivity analysis shows that the contrastive weight must be kept small.
 
-\subsection{Comparison with the Original Paper}
+\subsection{Implementation Takeaways}
 
-The original paper is written for a research audience and focuses on novelty,
-state-of-the-art comparisons, and compact formulation.  This report has a
-different purpose.  Several differences should be noted:
-
-\begin{itemize}[leftmargin=1.4em]
-  \item The paper covers four benchmarks; this report focuses on three (PACS,
-        VLCS, Office-Home).
-  \item The paper presents final averages over 3 seeds; the project uses fewer
-        seeds, introducing additional variance (see Table~\ref{tab:reproduction_vs_paper}).
-  \item The paper describes the architecture abstractly; this report maps it to
-        PyTorch modules, forward hooks, extraction blocks, and training scripts.
-  \item The paper uses the exact loss formulation in Eq.~(\ref{eq:p_layer})--(\ref{eq:total_loss}),
-        which this report reproduces faithfully.  The standard SupCon loss is a
-        different formulation.
-\end{itemize}
+The project turns the method into an executable training and evaluation pipeline.
+The most important engineering decisions are the use of forward hooks for
+intermediate activations, extraction blocks sized for different ResNet stages, a
+common interface for baselines, and JSON/CSV outputs for result aggregation.  This
+structure makes it possible to run the same leave-one-domain-out protocol across
+PACS, VLCS, and Office-Home while keeping the model-specific code isolated.
 
 \subsection{Practical Engineering Observations}
 
@@ -925,8 +875,8 @@ Three main threats limit the strength of quantitative conclusions.  First,
 incomplete or single-seed runs limit statistical confidence.  Second, DG
 performance can vary significantly across random seeds and data augmentation
 choices.  Third, implementation details such as augmentation type, optimizer
-settings, and source validation splits may differ from the original DomainBed
-protocol.
+settings, and source validation splits can influence the final numbers even when
+the high-level protocol is unchanged.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Limitations}
@@ -942,18 +892,16 @@ hard-negative mining for more informative batches.
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Conclusion}
 
-This report presented a detailed study and reproduction of \method{} for domain
+This report presented a detailed project study of \method{} for domain
 generalization.  The method addresses shortcut learning by extracting multiscale
 representations from intermediate CNN layers and by applying a supervised
 contrastive loss—defined as a class-conditional probability over pairwise
 similarities (Eq.~\ref{eq:p_layer}--\ref{eq:total_loss})—to improve class-level
 alignment across source domains.
 
-On PACS, VLCS, and Office-Home, the reproduction results confirm the paper's main
-claim: \method{} consistently improves average accuracy over strong DG baselines
-under both ResNet-18 and ResNet-50 backbones.  The reproduction is close to the
-published paper numbers (differences within $\approx\pm1$--$2$\% across settings),
-with any gaps attributable to fewer seeds and batch-composition variance.
+On PACS, VLCS, and Office-Home, the project results show that \method{}
+consistently improves average accuracy over strong DG baselines under both
+ResNet-18 and ResNet-50 backbones.
 Qualitative saliency maps further support the hypothesis that the method focuses
 more on object-relevant regions and less on unstable context.
 
@@ -961,7 +909,7 @@ more on object-relevant regions and less on unstable context.
 \appendix
 \section{Full Result Tables}
 
-The following pages reproduce the full result tables from the project experiments.
+The following pages provide the full result tables from the project experiments.
 
 \begin{figure}[H]
   \centering
@@ -1013,11 +961,6 @@ A.\ Torralba and A.\ A.\ Efros,
 H.\ Venkateswara, J.\ Eusebio, S.\ Chakraborty, and S.\ Panchanathan,
 ``Deep Hashing Network for Unsupervised Domain Adaptation,''
 \textit{IEEE Conf.\ on Computer Vision and Pattern Recognition (CVPR)}, 2017.
-
-\bibitem{nico}
-Y.\ He, Z.\ Shen, and P.\ Cui,
-``Towards Non-I.I.D.\ Image Classification: A Dataset and Baselines,''
-\textit{Pattern Recognition}, 2021.
 
 \end{thebibliography}
 
