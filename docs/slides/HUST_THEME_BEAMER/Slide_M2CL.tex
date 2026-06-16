@@ -42,7 +42,7 @@
 % Keep captions language-neutral and write English labels directly in slide text.
 \setbeamertemplate{caption}{\raggedright\insertcaption\par}
 
-\subtitle{\Large{Multiscale and Multilayer Contrastive Learning for Domain Generalization \textbf{($M^2-CL$)}}}
+\subtitle{\Large{Multiscale and Multilayer Contrastive Learning for Domain Generalization}}
 
 \author{\texorpdfstring{%
 	\textbf{Group 26 members} \\[2pt]
@@ -76,14 +76,14 @@
 	\useStyleHustFull
 	\useThinBar
 
-	\begin{frame}{Introduction to Domain Generalization (DG)}
+	\begin{frame}{Introduction to Domain Generalization}
 		\begin{block}{The Core Objective}
 			Train a parametric model $f(\cdot;\theta)$ on a set of $N$ available \textbf{source domains} $\mathcal{S} = \{S_1, S_2, \dots, S_N\}$ such that it generalizes robustly to $K$ completely \textbf{unseen target domains} $\mathcal{T} = \{T_1, T_2, \dots, T_K\}$.
 		\end{block}
 		\begin{alertblock}{The Strict Constraint vs. Domain Adaptation}
 			\begin{itemize}
-				\item \textbf{Domain Adaptation (DA):} Has access to unlabeled target domain data during training.
-				\item \textbf{Domain Generalization (DG):} \alert{Zero access} to target-domain data or target labels during the optimization cycle.
+				\item \textbf{Domain Adaptation:} Has access to unlabeled target domain data during training.
+				\item \textbf{Domain Generalization:} \alert{Zero access} to target-domain data or target labels during the optimization cycle.
 			\end{itemize}
 		\end{alertblock}
 	\end{frame}
@@ -409,7 +409,7 @@ and filters out raw structure details.
 		\end{columns}
     \begin{figure}
         \centering
-        \includegraphics[width=0.65\linewidth]{photos/dataset_cv1.png}
+        \includegraphics[width=0.55\linewidth]{photos/dataset_cv1.png}
         \label{fig:placeholder}
     \end{figure}
 	\end{frame}
@@ -618,7 +618,7 @@ p & 4 & yes & yes & 80.43 & 75.43 & 96.87 & 74.42 & 80.10 & 96.09 & 61.15 & 69.0
 
 	\begin{figure}
 		\centering
-		\includegraphics[width=0.78\linewidth]{photos/Pacs.png}
+		\includegraphics[width=0.8\linewidth]{photos/Pacs.png}
 
 		\caption{Saliency maps comparison on the PACS dataset.}
 	\end{figure}
