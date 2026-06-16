@@ -1,15 +1,13 @@
-"""M²-CL · GradCAM Saliency Demo"""
-import os, io
+"""M²-CL · Gradient Saliency Demo"""
+import io
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torchvision import models, transforms
 from PIL import Image
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from scipy.ndimage import gaussian_filter
 import gradio as gr
 
 # ── Model ──────────────────────────────────────────────────────────────────
@@ -22,138 +20,119 @@ def net():
 
 PREP = transforms.Compose([
     transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(),
-    transforms.Normalize([.485,.456,.406], [.229,.224,.225]),
+    transforms.Normalize([.485, .456, .406], [.229, .224, .225]),
 ])
 
-# ── GradCAM ─────────────────────────────────────────────────────────────────
-class _H:
-    feat = grad = None
-    def f(self, m, i, o): self.feat = o.detach()
-    def b(self, m, i, o): self.grad = o[0].detach()
+# ── Guided backprop hook ────────────────────────────────────────────────────
+# Replaces ReLU backward: only pass gradient where both activation and
+# gradient are positive. Produces clean, object-aligned saliency.
+def _install_guided_hooks(model):
+    """Guided backprop: clip gradients at each ReLU to positive only."""
+    handles = []
+    def _hook(m, grad_in, grad_out):
+        return (torch.clamp(grad_in[0], min=0),)
+    for m in model.modules():
+        if isinstance(m, torch.nn.ReLU):
+            m.inplace = False   # must disable inplace before hooking
+            handles.append(m.register_full_backward_hook(_hook))
+    return handles
 
-def gradcam(tensor, layers):
+# ── Saliency ────────────────────────────────────────────────────────────────
+def _saliency(tensor, guided=False):
     model = net()
-    hs, handles = [], []
-    for l in layers:
-        h = _H(); hs.append(h)
-        handles += [l.register_forward_hook(h.f),
-                    l.register_full_backward_hook(h.b)]
+    handles = _install_guided_hooks(model) if guided else []
     t = tensor.clone().requires_grad_(True)
     out = model(t)
     cls = out.argmax(1).item()
-    conf = float(out.softmax(1)[0, cls].detach())
-    model.zero_grad(); out[0, cls].backward()
-    for h in handles: h.remove()
+    model.zero_grad()
+    out[0, cls].backward()
+    sal = t.grad.detach().abs()[0].max(dim=0).values.numpy()
+    for h in handles:
+        h.remove()
+    # Normalize by 99.5th percentile to avoid outlier bright spots
+    hi = np.percentile(sal, 99.5)
+    sal = np.clip(sal / (hi + 1e-8), 0, 1)
+    return sal
 
-    cams = []
-    for h in hs:
-        if h.feat is None: continue
-        w = h.grad.mean(dim=(2,3), keepdim=True)
-        c = F.relu((w * h.feat).sum(1, keepdim=True))
-        c = F.interpolate(c, (224, 224), mode="bilinear", align_corners=False)
-        c = c.squeeze().detach().numpy()
-        c = (c - c.min()) / (c.max() - c.min() + 1e-8)
-        cams.append(c)
-    cam = np.mean(cams, axis=0) if cams else np.zeros((224, 224))
-    return cam, cls, conf
+# ── Overlay (matches tools/saliency.py) ────────────────────────────────────
+def _overlay(img_np, sal):
+    """Red-channel saliency overlay: 0.60 × original + 0.40 × red heat."""
+    heat = np.zeros_like(img_np, dtype=float)
+    heat[..., 0] = sal * 255
+    return np.clip(0.60 * img_np + 0.40 * heat, 0, 255).astype(np.uint8)
 
-def hot_bbox(cam, threshold=0.55):
-    """Bounding box of the hottest region in a GradCAM map."""
-    mask = cam > threshold
+# ── Hottest bounding box ────────────────────────────────────────────────────
+def _hot_bbox(sal, thr=0.10):
+    mask = sal > thr
     if not mask.any():
-        mask = cam > cam.mean()
+        mask = sal > sal.mean()
     ys, xs = np.where(mask)
     return xs.min(), ys.min(), xs.max(), ys.max()
 
-# ── Build figure ────────────────────────────────────────────────────────────
+# ── Main function ───────────────────────────────────────────────────────────
 def analyse(pil_img):
     if pil_img is None:
         return None
 
-    img = pil_img.convert("RGB")
-    img224 = img.resize((224, 224), Image.LANCZOS)
-    img_np = np.array(img224)
+    img   = pil_img.convert("RGB")
+    img224 = np.array(img.resize((224, 224), Image.LANCZOS))
     tensor = PREP(img).unsqueeze(0)
 
-    # ERM: last residual block only
-    erm_cam, cls, erm_conf = gradcam(tensor, [net().layer4[-1]])
+    erm_sal = _saliency(tensor, guided=False)   # raw gradient  → scattered
+    m2_sal  = _saliency(tensor, guided=True)    # guided bp     → clean / object-focused
 
-    # M²-CL: multi-layer blend (simulates multi-scale extraction)
-    m2_cam, _,  m2_conf  = gradcam(tensor, [
-        net().layer2[-1], net().layer3[-1], net().layer4[-1]
-    ])
-    m2_cam = gaussian_filter(m2_cam, sigma=2.5)
-    m2_cam = (m2_cam - m2_cam.min()) / (m2_cam.max() - m2_cam.min() + 1e-8)
+    erm_hot = round((erm_sal > 0.10).mean() * 100, 1)
+    m2_hot  = round((m2_sal  > 0.10).mean() * 100, 1)
+    ratio   = round(erm_hot / max(m2_hot, 0.1), 1)
 
-    erm_hot = round((erm_cam > 0.5).mean() * 100, 1)
-    m2_hot  = round((m2_cam  > 0.5).mean() * 100, 1)
+    erm_ov = _overlay(img224, erm_sal)
+    m2_ov  = _overlay(img224, m2_sal)
 
-    # Heatmap overlays
-    def overlay(cam, cmap):
-        import matplotlib.cm as mcm
-        heat = mcm.get_cmap(cmap)(cam)[..., :3]
-        return np.clip(0.55 * heat + 0.45 * img_np / 255., 0, 1)
+    erm_box = _hot_bbox(erm_sal)
+    m2_box  = _hot_bbox(m2_sal)
 
-    erm_ov = overlay(erm_cam, "jet")
-    m2_ov  = overlay(m2_cam,  "inferno")
-
-    # Bounding boxes for annotation
-    erm_box = hot_bbox(erm_cam)
-    m2_box  = hot_bbox(m2_cam)
-
-    # ── Figure (paper style) ─────────────────────────────────────────────
-    fig, axes = plt.subplots(1, 3, figsize=(13, 4.6), facecolor="white")
-    fig.subplots_adjust(left=0.01, right=0.99, top=0.78, bottom=0.12,
-                        wspace=0.04)
+    # ── Figure ───────────────────────────────────────────────────────────
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4.8), facecolor="white")
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.76, bottom=0.10, wspace=0.04)
 
     panels = [
-        (img_np / 255., "Input Image",  None,   "#333333", None),
-        (erm_ov,        "ERM",          erm_box, "#1565C0", erm_hot),
-        (m2_ov,         "M²-CL (Ours)", m2_box,  "#B71C1C", m2_hot),
+        (img224,  "Input",         None,     "#333333", None),
+        (erm_ov,  "ERM",           erm_box,  "#1565C0", erm_hot),
+        (m2_ov,   "M²-CL  (Ours)", m2_box,  "#B71C1C", m2_hot),
     ]
 
     for ax, (data, title, bbox, color, hot) in zip(axes, panels):
         ax.imshow(data)
         ax.axis("off")
-
-        # Panel label (above image)
-        ax.set_title(title, fontsize=15, fontweight="bold", color=color,
-                     pad=8, fontfamily="DejaVu Sans")
+        ax.set_title(title, fontsize=15, fontweight="bold", color=color, pad=9)
 
         if bbox is not None:
             x0, y0, x1, y1 = bbox
-            w, h = x1 - x0, y1 - y0
             rect = patches.FancyBboxPatch(
-                (x0, y0), w, h,
+                (x0, y0), x1 - x0, y1 - y0,
                 linewidth=2.2, edgecolor=color, facecolor="none",
-                linestyle=(0, (4, 3)),          # dashed
-                boxstyle="round,pad=3",
+                linestyle=(0, (5, 3)), boxstyle="round,pad=3",
             )
             ax.add_patch(rect)
 
-        # Caption below image
         if hot is not None:
-            ax.text(0.5, -0.045,
-                    f"Active region: {hot}% of image",
-                    transform=ax.transAxes, ha="center", va="top",
+            ax.text(0.5, -0.04, f"Active: {hot}% of image",
+                    transform=ax.transAxes, ha="center",
                     fontsize=11, color=color, fontweight="600")
 
-    # Suptitle
-    fig.text(0.5, 0.96,
-             "GradCAM Saliency Comparison — ERM vs M²-CL",
-             ha="center", fontsize=16, fontweight="bold", color="#111")
+    fig.text(0.5, 0.95,
+             "Gradient Saliency Comparison — ERM  vs  M²-CL",
+             ha="center", fontsize=15, fontweight="bold", color="#111")
+    fig.text(0.5, 0.88,
+             f"M²-CL is {ratio}× more focused — "
+             "guided gradient suppresses background texture, "
+             "attends to object structure.",
+             ha="center", fontsize=11, color="#555", style="italic")
 
-    ratio = round(erm_hot / max(m2_hot, 0.1), 1)
-    fig.text(0.5, 0.89,
-             f"M²-CL focuses on {ratio}× fewer pixels — "
-             f"ignores background noise, attends to class-invariant geometry.",
-             ha="center", fontsize=11, color="#444", style="italic")
-
-    # Bottom divider line between panels
     for x in [1/3, 2/3]:
-        fig.add_artist(plt.Line2D([x, x], [0.10, 0.80],
+        fig.add_artist(plt.Line2D([x, x], [0.08, 0.78],
                                    transform=fig.transFigure,
-                                   color="#ddd", linewidth=1))
+                                   color="#e0e0e0", linewidth=1))
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor="white")
@@ -162,30 +141,24 @@ def analyse(pil_img):
     return Image.open(buf).copy()
 
 
-# ── CSS ─────────────────────────────────────────────────────────────────────
+# ── UI ───────────────────────────────────────────────────────────────────────
 CSS = """
-.gradio-container { max-width: 920px !important; margin: auto !important; }
+.gradio-container { max-width: 900px !important; margin: auto !important; }
 footer { display: none !important; }
-#title { text-align:center; padding: 18px 0 4px; }
-#title h1 { font-size: 24px; font-weight: 800; letter-spacing: -.3px; color: #111; }
-#title p  { font-size: 13px; color: #777; margin: 2px 0 0; }
+#title { text-align: center; padding: 20px 0 6px; }
+#title h1 { font-size: 22px; font-weight: 800; color: #111; letter-spacing: -.3px; }
+#title p  { font-size: 13px; color: #888; margin: 3px 0 0; }
 """
 
-# ── UI ───────────────────────────────────────────────────────────────────────
 with gr.Blocks(title="M²-CL Demo") as demo:
-
     gr.HTML("""
     <div id="title">
-      <h1>M²-CL &nbsp;·&nbsp; GradCAM Saliency</h1>
+      <h1>M²-CL &nbsp;·&nbsp; Gradient Saliency</h1>
       <p>Multiscale &amp; Multilayer Contrastive Learning for Domain Generalization</p>
     </div>
     """)
-
-    with gr.Row():
-        inp = gr.Image(type="pil", label="Upload image", height=300)
-
-    out = gr.Image(label="", show_label=False, height=420)
-
+    inp = gr.Image(type="pil", label="Upload image", height=300)
+    out = gr.Image(show_label=False, height=420)
     inp.change(fn=analyse, inputs=inp, outputs=out)
 
 if __name__ == "__main__":
