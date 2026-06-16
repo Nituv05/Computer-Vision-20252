@@ -239,15 +239,27 @@ with gr.Blocks(title="M²-CL Demo") as demo:
       <p>Multiscale &amp; Multilayer Contrastive Learning for Domain Generalization</p>
     </div>
     """)
-    inp = gr.Image(
-        type="pil",
-        sources=["upload", "clipboard"],
-        label="Upload or paste an image  (Ctrl+V)",
-        height=280,
-        placeholder="Drag & drop, click to upload, or paste from clipboard (Ctrl+V)",
-    )
+
+    with gr.Row():
+        # Main upload (file + clipboard)
+        inp = gr.Image(
+            type="pil",
+            sources=["upload", "clipboard"],
+            label="Upload or paste an image  (Ctrl+V)",
+            height=260,
+        )
+        # Dedicated webcam panel
+        cam = gr.Image(
+            type="pil",
+            sources=["webcam"],
+            label="📷  Webcam",
+            height=260,
+        )
+
     out = gr.Image(show_label=False, height=460)
+
     inp.change(fn=analyse, inputs=inp, outputs=out)
+    cam.change(fn=analyse, inputs=cam, outputs=out)
 
 if __name__ == "__main__":
     demo.launch(server_port=7860, css=CSS)
