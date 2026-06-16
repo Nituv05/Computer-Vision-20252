@@ -3,7 +3,6 @@ Evaluate saved checkpoints on leave-one-domain/context-out splits.
 
 Examples:
   python tools/evaluate.py --dataset pacs --method m2cl
-  python tools/evaluate.py --dataset nico --method m2cl
 """
 import argparse
 
@@ -27,22 +26,10 @@ PAPER_AVERAGES = {
         "resnet18": {"ERM": 57.10, "M2": 61.29, "M2-CL": 63.27},
         "resnet50": {"ERM": 67.27, "M2": 69.64, "M2-CL": 71.07},
     },
-    "nico": {
-        "resnet18": {
-            "M2-CL N3": 87.93,
-            "M2-CL N5": 84.10,
-            "M2-CL N7": 82.14,
-        },
-        "resnet50": {
-            "M2-CL N3": 89.30,
-            "M2-CL N5": 87.68,
-            "M2-CL N7": 86.90,
-        },
-    },
 }
 
 
-def evaluate_checkpoint(args, cfg, split_name, test_domain=None, n_heldout=None):
+def evaluate_checkpoint(args, cfg, split_name, test_domain=None):
     ckpt_path = checkpoint_path(
         args.checkpoint_dir,
         args.dataset,
@@ -60,7 +47,6 @@ def evaluate_checkpoint(args, cfg, split_name, test_domain=None, n_heldout=None)
         args.dataset,
         args.data_root,
         test_domain,
-        n_heldout,
         args.batch_size,
         args.num_workers,
         args.seed,
@@ -93,14 +79,13 @@ def evaluate_checkpoint(args, cfg, split_name, test_domain=None, n_heldout=None)
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True,
-                        choices=["pacs", "vlcs", "office_home", "nico"])
+                        choices=["pacs", "vlcs", "office_home"])
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--checkpoint_dir", default="./outputs/checkpoints")
     parser.add_argument("--method", choices=METHODS, default="m2cl")
     parser.add_argument("--backbone", choices=["resnet18", "resnet50"],
                         default="resnet18")
     parser.add_argument("--test_domain", default=None)
-    parser.add_argument("--n_heldout", type=int, default=None)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--num_workers", type=int, default=4)
     parser.add_argument("--seed", type=int, default=0)
@@ -115,25 +100,13 @@ def main():
     )
 
     results = {}
-    if args.dataset == "nico":
-        heldout_values = [args.n_heldout] if args.n_heldout else cfg.get(
-            "heldout_contexts", [3, 5, 7]
+    domains = [args.test_domain] if args.test_domain else cfg["domains"]
+    for domain in domains:
+        acc = evaluate_checkpoint(
+            args, cfg, domain, test_domain=domain
         )
-        for n_heldout in heldout_values:
-            split_name = f"N{n_heldout}"
-            acc = evaluate_checkpoint(
-                args, cfg, split_name, n_heldout=n_heldout
-            )
-            if acc is not None:
-                results[split_name] = acc
-    else:
-        domains = [args.test_domain] if args.test_domain else cfg["domains"]
-        for domain in domains:
-            acc = evaluate_checkpoint(
-                args, cfg, domain, test_domain=domain
-            )
-            if acc is not None:
-                results[domain] = acc
+        if acc is not None:
+            results[domain] = acc
 
     if results:
         avg = sum(results.values()) / len(results)

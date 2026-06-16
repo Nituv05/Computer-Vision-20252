@@ -183,7 +183,7 @@ EOF
   echo "✅ Setup xong."
 }
 
-# ----- Helper: tải dataset về server (vào \$DEST/\$DATA_ROOT). NICO phải tải tay theo README -----
+# ----- Helper: tải dataset về server (vào \$DEST/\$DATA_ROOT). -----
 do_data() {
   echo "==> Tải dataset [$DATASETS] vào $HOST:$DEST/$DATA_ROOT ..."
   ssh "$HOST" "bash -s" <<EOF

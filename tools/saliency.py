@@ -40,14 +40,13 @@ def saliency_overlay(image: np.ndarray, saliency: np.ndarray) -> Image.Image:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True,
-                        choices=["pacs", "vlcs", "office_home", "nico"])
+                        choices=["pacs", "vlcs", "office_home"])
     parser.add_argument("--data_root", default="./data_root")
     parser.add_argument("--checkpoint_dir", default="./outputs/checkpoints")
     parser.add_argument("--method", choices=METHODS, default="m2cl")
     parser.add_argument("--backbone", choices=["resnet18", "resnet50"],
                         default="resnet18")
     parser.add_argument("--test_domain", default=None)
-    parser.add_argument("--n_heldout", type=int, default=None)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--tag", default=None)
     parser.add_argument("--max_images", type=int, default=8)
@@ -55,20 +54,14 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(args.dataset)
-    if args.dataset == "nico":
-        if args.n_heldout is None:
-            raise ValueError("--n_heldout is required for NICO saliency")
-        split_name = f"N{args.n_heldout}"
-    else:
-        if args.test_domain is None:
-            raise ValueError("--test_domain is required for saliency")
-        split_name = args.test_domain
+    if args.test_domain is None:
+        raise ValueError("--test_domain is required for saliency")
+    split_name = args.test_domain
 
     _, test_set, _ = build_raw_loaders(
         args.dataset,
         args.data_root,
         args.test_domain,
-        args.n_heldout,
         batch_size=1,
         num_workers=0,
         seed=args.seed,
