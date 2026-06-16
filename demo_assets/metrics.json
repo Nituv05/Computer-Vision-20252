@@ -1,0 +1,52 @@
+{
+  "cheetah": {
+    "label": "Cheetah",
+    "desc": "Animal on grassland",
+    "erm_pred": "cheetah",
+    "m2_pred": "cheetah",
+    "erm_conf": 88.1,
+    "m2_conf": 88.1,
+    "erm_hot": 29.4,
+    "m2_hot": 9.9
+  },
+  "lion": {
+    "label": "Lion",
+    "desc": "Animal portrait",
+    "erm_pred": "lion",
+    "m2_pred": "lion",
+    "erm_conf": 99.9,
+    "m2_conf": 99.9,
+    "erm_hot": 33.3,
+    "m2_hot": 21.6
+  },
+  "tower": {
+    "label": "Tower",
+    "desc": "Urban architecture",
+    "erm_pred": "bell-cot",
+    "m2_pred": "bell-cot",
+    "erm_conf": 27.4,
+    "m2_conf": 27.4,
+    "erm_hot": 30.4,
+    "m2_hot": 14.4
+  },
+  "person": {
+    "label": "Grace Hopper",
+    "desc": "Person \u2014 diverse background",
+    "erm_pred": "military uniform",
+    "m2_pred": "military uniform",
+    "erm_conf": 43.3,
+    "m2_conf": 43.3,
+    "erm_hot": 46.2,
+    "m2_hot": 10.5
+  },
+  "flower": {
+    "label": "Flower",
+    "desc": "Close-up plant texture",
+    "erm_pred": "honeycomb",
+    "m2_pred": "honeycomb",
+    "erm_conf": 66.3,
+    "m2_conf": 66.3,
+    "erm_hot": 32.6,
+    "m2_hot": 34.8
+  }
+}
