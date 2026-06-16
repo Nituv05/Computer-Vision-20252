@@ -2,12 +2,12 @@
 Pre-compute saliency comparison figures for the M2-CL demo.
 Saves results to demo_assets/ — run once before starting demo.py.
 """
-import os, shutil
+import os
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torchvision import models, transforms
-from PIL import Image, ImageFilter
+from PIL import Image
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -24,9 +24,10 @@ os.makedirs(CMP_DIR, exist_ok=True)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ── Source images (bundled with installed packages — no download needed) ──
-GRADIO_IMGS = "/home/duck/miniconda3/lib/python3.13/site-packages/gradio/media_assets/images"
-MPL_SAMPLE  = "/home/duck/miniconda3/lib/python3.13/site-packages/matplotlib/mpl-data/sample_data"
-SK_IMGS     = "/home/duck/miniconda3/lib/python3.13/site-packages/sklearn/datasets/images"
+import gradio as _gr, matplotlib as _mpl, sklearn as _sk
+GRADIO_IMGS = os.path.join(os.path.dirname(_gr.__file__), "media_assets", "images")
+MPL_SAMPLE  = os.path.join(os.path.dirname(_mpl.__file__), "mpl-data", "sample_data")
+SK_IMGS     = os.path.join(os.path.dirname(_sk.__file__), "datasets", "images")
 
 SOURCES = [
     ("cheetah",  f"{GRADIO_IMGS}/cheetah.jpg",   "Cheetah",  "Animal on grassland"),

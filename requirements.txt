@@ -8,3 +8,7 @@ gdown>=5.2,<6.0
 huggingface_hub[hf_xet]>=0.36
 pyarrow>=14.0
 wandb>=0.17
+matplotlib>=3.7
+scipy>=1.11
+gradio>=5.0
+scikit-learn>=1.3
