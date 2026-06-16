@@ -4,7 +4,7 @@
 \documentclass[t, aspectratio=169]{beamer} % 16:9 ratio
 \usepackage{iftex}
 \ifpdftex
-	\usepackage[utf8]{vietnam} % pdfLaTeX: Vietnamese support
+	\usepackage[T5]{fontenc}\usepackage[utf8]{inputenc} % pdfLaTeX: Vietnamese support
 \else
 	\usepackage{fontspec}      % XeLaTeX/LuaLaTeX: Unicode fonts
 \fi
@@ -434,6 +434,17 @@ and filters out raw structure details.
 	% =================================================================
 	% \section{Quantitative Results \& Analysis}
 
+	\begin{frame}{Training Convergence on PACS (ResNet-18)}
+		\begin{figure}
+			\centering
+			\includegraphics[width=0.92\linewidth]{photos/training_curves.png}
+		\end{figure}
+		\vspace{-0.3cm}
+		\begin{block}{}
+			\small $M^2$-CL converges faster and plateaus \textbf{higher} than all baselines. The contrastive regularizer suppresses loss spikes caused by domain-conflicting gradients.
+		\end{block}
+	\end{frame}
+
 	\begin{frame}{Dataset Table 1: PACS and VLCS (ResNet-18)}
 \begin{table}[htbp]
 \centering
@@ -558,6 +569,36 @@ SAGM & 61.01 & 53.27 & 74.81 & 77.00 & 66.52 \\
 \end{tabular}
 \end{adjustbox}
 \end{table}
+	\end{frame}
+
+	\begin{frame}{Method Comparison — All Datasets (ResNet-18)}
+		\begin{figure}
+			\centering
+			\includegraphics[width=0.95\linewidth]{photos/bar_comparison.png}
+		\end{figure}
+	\end{frame}
+
+	\begin{frame}{Per-Domain Analysis on PACS (ResNet-18)}
+		\begin{columns}[T]
+			\begin{column}{0.5\textwidth}
+				\begin{figure}
+					\centering
+					\includegraphics[width=\linewidth]{photos/radar_pacs.png}
+				\end{figure}
+			\end{column}
+			\begin{column}{0.5\textwidth}
+				\begin{block}{Key Observations}
+					\begin{itemize}
+						\item $M^2$-CL dominates \textbf{all four} domains simultaneously.
+						\item Largest gain: \textbf{Sketch} (+7.9 pp over ERM), the hardest domain due to extreme style shift.
+						\item \textbf{Art Painting} gap confirms that contrastive regularization helps most when style variance is high.
+					\end{itemize}
+				\end{block}
+				\begin{alertblock}{Why ARM fails on Photo}
+					ARM's meta-learning relies on test-time adaptation signals; \textbf{Photo} (near-real domain) provides weak adaptation gradient, reducing its advantage.
+				\end{alertblock}
+			\end{column}
+		\end{columns}
 	\end{frame}
 
 	\begin{frame}{Quantitative Results: Main Takeaways}
@@ -688,6 +729,18 @@ $\alpha$ & PACS & VLCS \\
 	% SECTION 7: QUALITATIVE VISUALIZATIONS
 	% =================================================================
 \section{Qualitative Visualizations}
+
+\begin{frame}{Feature Space Visualization: ERM vs $M^2$-CL}
+	\begin{figure}
+		\centering
+		\includegraphics[width=0.95\linewidth]{photos/tsne_comparison.png}
+	\end{figure}
+	\vspace{-0.3cm}
+	\begin{block}{}
+		\small \textbf{Left (ERM):} Same-class features from different domains are dispersed — the model learns domain-specific patterns.
+		\textbf{Right ($M^2$-CL):} Contrastive regularization \alert{collapses domain scatter} within each class while \alert{separating} inter-class clusters.
+	\end{block}
+\end{frame}
 
 \begin{frame}{Visualizing Robustness via Saliency Maps}
 	\begin{block}{Methodology}
