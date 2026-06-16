@@ -231,7 +231,7 @@ with gr.Blocks(title="M²-CL Demo") as demo:
         label="Upload / Webcam / Paste image (Ctrl+V)",
         height=270,
     )
-    out = gr.Image(show_label=False, height=620)
+    out = gr.Image(show_label=False, height=620, format="png")
     inp.change(fn=analyse, inputs=inp, outputs=out)
 
 if __name__ == "__main__":
