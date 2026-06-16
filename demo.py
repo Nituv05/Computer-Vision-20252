@@ -19,7 +19,7 @@ _net = None
 def net():
     global _net
     if _net is None:
-        _net = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1).eval()
+        _net = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2).eval()
     return _net
 
 PREP = transforms.Compose([
@@ -235,4 +235,9 @@ with gr.Blocks(title="M²-CL Demo") as demo:
     inp.change(fn=analyse, inputs=inp, outputs=out)
 
 if __name__ == "__main__":
-    demo.launch(server_port=7860, show_error=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=7860)
+    parser.add_argument("--host", type=str, default="0.0.0.0")
+    args = parser.parse_args()
+    demo.launch(server_name=args.host, server_port=args.port, show_error=True)
