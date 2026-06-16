@@ -2,12 +2,8 @@
 % !TeX root = Slide_M2CL.tex
 
 \documentclass[t, aspectratio=169]{beamer} % 16:9 ratio
-\usepackage{iftex}
-\ifpdftex
-	\usepackage[T5]{fontenc}\usepackage[utf8]{inputenc} % pdfLaTeX: Vietnamese support
-\else
-	\usepackage{fontspec}      % XeLaTeX/LuaLaTeX: Unicode fonts
-\fi
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage{amsthm,amsmath,amssymb}
 \usepackage{lmodern}
 \usepackage{booktabs} % nicer tables
@@ -46,9 +42,9 @@
 
 \author{\texorpdfstring{%
 	\textbf{Group 26 members} \\[2pt]
-	Vũ Thường Tín - 20230091 \\[1pt]
-	Chu Anh Đức - 20230081 \\[1pt]
-	Nguyễn Xuân Khải - 20235508%
+	Vu Thuong Tin - 20230091 \\[1pt]
+	Chu Anh Duc - 20230081 \\[1pt]
+	Nguyen Xuan Khai - 20235508%
 }{Group 26}}
 
 
@@ -57,24 +53,23 @@
 	% Pre-pages defined by HUST theme
 	\hustintropage{}
 	% \hustsectionpage{}
+	\resetPageCount
+	\showPageNumber
 	\husttitlepage
 
 	% =================================================================
 	% AGENDA
 	% =================================================================
+	\useStyleHustFull
+	\useThinBar
 	\begin{frame}{Presentation Agenda}
 		\tableofcontents
 	\end{frame}
-
-	\resetPageCount  
-	\showPageNumber  
 
 	% =================================================================
 	% SECTION 1: INTRODUCTION & MOTIVATION
 	% =================================================================
 	\section{Introduction}
-	\useStyleHustFull
-	\useThinBar
 
 	\begin{frame}{Introduction to Domain Generalization}
 		\begin{block}{The Core Objective}
