@@ -100,8 +100,8 @@
 				\begin{alertblock}{What $M^2$-CL Contributes}
 					\begin{itemize}
 						\item \textbf{Multi-scale \& multi-layer} extraction captures geometry at every depth.
-						\item \textbf{Spatial Dropout} in each block prevents style shortcuts from leaking.
-						\item \textbf{Layer-wise contrastive loss} enforces same-class alignment across domains at \emph{all} scales simultaneously.
+						\item \textbf{Spatial Dropout} in each block reduces reliance on style shortcuts.
+						\item \textbf{Layer-wise contrastive loss} encourages same-class alignment across domains at \emph{all} scales simultaneously.
 					\end{itemize}
 				\end{alertblock}
 			\end{column}
@@ -268,7 +268,7 @@ and filters out raw structure details.
 			\end{block}
 			\vspace{0.15cm}
 			\begin{alertblock}{Spatial Dropout}
-				\small Drops \textbf{entire feature maps} ($H \times W$ channels). Forces the network to rely on alternative feature maps, \textbf{blocking style shortcuts} at the source.
+				\small Drops \textbf{entire feature maps} ($H \times W$ channels). Encourages the network to rely on alternative feature maps, \textbf{reducing style shortcut reliance} at the source.
 			\end{alertblock}
 		\end{column}
 		\begin{column}{0.58\textwidth}
@@ -325,7 +325,7 @@ and filters out raw structure details.
             
             \begin{exampleblock}{Matrix Parallelization}
                 \begin{itemize}
-                    \item Prevents memory bottlenecks.
+                    \item Reduces memory bottlenecks.
                     \item Stacks batch: $U^{(l)T}U^{(l)}$.
                     \item Denominator computed \textbf{once}.
                 \end{itemize}
@@ -577,8 +577,8 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 			\end{block}
 			\vspace{0.1cm}
 			\begin{alertblock}{$M^2$-CL (Right)}
-				\small The layer-wise contrastive loss \textbf{collapses intra-class domain scatter}: all domains for the same class cluster tightly, while inter-class boundaries stay sharp.\\[4pt]
-				\textbf{Insight:} The network has learned truly \emph{domain-invariant} representations, directly validating the contrastive objective.
+				\small The layer-wise contrastive loss \textbf{reduces intra-class domain scatter}: samples from the same class become more compact, while inter-class boundaries remain clearer.\\[4pt]
+				\textbf{Insight:} The visualization suggests more domain-robust representations and is consistent with the contrastive objective.
 			\end{alertblock}
 		\end{column}
 	\end{columns}
@@ -597,8 +597,8 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 			\end{block}
 			\vspace{0.1cm}
 			\begin{alertblock}{$M^2$-CL}
-				\small Saliency concentrates on \textbf{object contours and edges}, consistent across Photo, Art, Cartoon, and Sketch domains.\\[4pt]
-				\textbf{Insight:} The contrastive loss forces the network to anchor decisions on \emph{structural geometry}, not style --- the intended inductive bias.
+				\small Saliency tends to concentrate more on \textbf{object contours and edges} across Photo, Art, Cartoon, and Sketch domains.\\[4pt]
+				\textbf{Insight:} The contrastive loss encourages the network to rely more on \emph{structural geometry} and less on style-specific cues.
 			\end{alertblock}
 		\end{column}
 	\end{columns}
@@ -633,9 +633,9 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 	\begin{frame}{Summary of Key Contributions}
 		\begin{block}{Core Achievements}
 			\begin{itemize}
-				\item \textbf{Architecture:} Successfully combines multi-scale, multi-layer intermediate features without propagating domain-specific styles through the network.
-				\item \textbf{Loss Optimization:} Introduces a layer-wise contrastive loss that enforces domain invariance across all extraction levels.
-				\item \textbf{Empirical Validation:} Outperforms previous domain generalization methods and sets a new state-of-the-art across four major benchmark datasets.
+				\item \textbf{Architecture:} Combines multi-scale, multi-layer intermediate features while reducing reliance on domain-specific styles.
+				\item \textbf{Loss Optimization:} Introduces a layer-wise contrastive loss that encourages class-level alignment across extraction levels.
+				\item \textbf{Empirical Validation:} Shows competitive improvements over strong domain generalization baselines across three selected benchmark datasets.
 			\end{itemize}
 		\end{block}
 	\end{frame}
@@ -648,7 +648,7 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 			\end{itemize}
 		\end{block}
 		\begin{alertblock}{Future Research Avenues}
-			Explore cross-layer attention mechanics, build causal inference systems, and evaluate alternative similarity metrics like KL divergence to refine latent distribution shapes.
+			Explore cross-layer attention mechanisms, analyze object-level evidence more rigorously, and evaluate alternative similarity metrics like KL divergence to refine latent distribution shapes.
 		\end{alertblock}
 	\end{frame}
 
