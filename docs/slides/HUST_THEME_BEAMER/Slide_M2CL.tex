@@ -77,7 +77,7 @@
 		\end{block}
 		\begin{alertblock}{Why Is This Hard?}
 			\begin{itemize}
-				\item \alert{Zero access} to target-domain data during training --- no direct supervision signal.
+				\item \alert{Zero access} to target-domain data during training no direct supervision signal.
 				\item Models must learn \textbf{domain-invariant} features from source data alone.
 				\item Distribution shift at test time causes catastrophic accuracy drops in naive ERM.
 			\end{itemize}
@@ -89,19 +89,19 @@
 			\begin{column}{0.50\textwidth}
 				\begin{block}{Representative DG Approaches}
 					\begin{itemize}
-						\item \textbf{ERM:} Aggregates all source data --- learns domain-specific shortcuts.
-						\item \textbf{CORAL / MMD:} Aligns first/second-order statistics --- \alert{single layer only}, loses geometric detail.
-						\item \textbf{RSC:} Drops dominant features at training --- ignores multi-scale structure.
-						\item \textbf{Mixup:} Interpolates images across domains --- does not enforce feature invariance.
+						\item \textbf{ERM:} Aggregates all source data learns domain-specific shortcuts.
+						\item \textbf{CORAL / MMD:} Aligns first/second-order statistics \alert{single layer only}, loses geometric detail.
+						\item \textbf{RSC:} Drops dominant features at training ignores multi-scale structure.
+						\item \textbf{Mixup:} Interpolates images across domains does not enforce feature invariance.
 					\end{itemize}
 				\end{block}
 			\end{column}
 			\begin{column}{0.50\textwidth}
 				\begin{alertblock}{What $M^2$-CL Contributes}
 					\begin{itemize}
-						\item \textbf{Multi-scale \& multi-layer} extraction --- captures geometry at every depth.
-						\item \textbf{Spatial Dropout} in each block --- prevents style shortcuts from leaking.
-						\item \textbf{Layer-wise contrastive loss} --- enforces same-class alignment across domains at \emph{all} scales simultaneously.
+						\item \textbf{Multi-scale \& multi-layer} extraction captures geometry at every depth.
+						\item \textbf{Spatial Dropout} in each block prevents style shortcuts from leaking.
+						\item \textbf{Layer-wise contrastive loss} enforces same-class alignment across domains at \emph{all} scales simultaneously.
 					\end{itemize}
 				\end{alertblock}
 			\end{column}
@@ -111,18 +111,19 @@
 \begin{frame}{Why ERM Fails: Shortcut Learning}
 		\begin{columns}[T]
 			\begin{column}{0.45\textwidth}
-				\begin{block}{The ERM Trap}
-					\begin{itemize}
-						\item Minimizes training loss by exploiting \alert{superficial shortcuts} (textures, backgrounds) rather than object geometry.
-						\item These cues \textbf{vanish or invert} under domain shift.
-					\end{itemize}
-				\end{block}
-				\begin{alertblock}{This Motivates $M^2$-CL}
-					\begin{itemize}
-						\item Need to \textbf{force the model} to rely on structural, domain-invariant features.
-						\item Solution: align same-class representations across domains at \emph{multiple scales}.
-					\end{itemize}
-				\end{alertblock}
+				\begin{block}{ERM Trap}
+    \begin{itemize}
+        \item Learns \alert{spurious cues} instead of structure.
+        \item Fails under domain shift.
+    \end{itemize}
+\end{block}
+
+\begin{alertblock}{$M^2$-CL Motivation}
+    \begin{itemize}
+        \item Enforce domain-invariant features.
+        \item Align same-class features at multiple scales.
+    \end{itemize}
+\end{alertblock}
 			\end{column}
 			\begin{column}{0.55\textwidth}
 				\centering
@@ -369,12 +370,12 @@ and filters out raw structure details.
 			\end{column}
 			\begin{column}{0.50\textwidth}
 				\begin{alertblock}{Architecture \& Loss}
-					\begin{itemize}
-						\item \textbf{$r = 4$:} Ablation (Table 3) shows best accuracy/memory trade-off; $r{=}2$ overfits, $r{=}6$ under-compresses.
-						\item \textbf{$\alpha = 0.01$:} Contrastive term guides without dominating CE loss; larger $\alpha$ collapses to 64\% PACS.
-						\item \textbf{$\tau = 1.0$:} Robust default; sensitivity analysis (Appendix) shows stable performance across $\tau \in [0.8, 1.4]$.
-					\end{itemize}
-				\end{alertblock}
+    \begin{itemize}
+        \item \textbf{$r \in \{2,4,6\}$:} Compression ratio of the projection module.
+        \item \textbf{$\alpha \in [0.001,0.1]$:} Weight of the contrastive loss.
+        \item \textbf{$\tau \in [0.8,1.4]$:} Temperature in contrastive learning.
+    \end{itemize}
+\end{alertblock}
 			\end{column}
 		\end{columns}
 	\end{frame}
@@ -382,10 +383,10 @@ and filters out raw structure details.
 	\begin{frame}{Benchmark Datasets}
 		\begin{columns}[T]
 			\begin{column}{0.33\textwidth}
-				\begin{alertblock}{VLCS}
+				\begin{block}{VLCS}
 					\small\textbf{10,729 images} | 5 classes\\
 					Domains: PASCAL, LabelMe, Caltech, SUN
-				\end{alertblock}
+				\end{block}
 			\end{column}
 			\begin{column}{0.33\textwidth}
 				\begin{block}{PACS}
@@ -402,7 +403,7 @@ and filters out raw structure details.
 		\end{columns}
 		\begin{figure}
 			\centering
-			\includegraphics[width=0.60\linewidth]{photos/dataset_cv1.png}
+			\includegraphics[width=0.75\linewidth]{photos/dataset_cv1.png}
 		\end{figure}
 	\end{frame}
 
@@ -418,15 +419,14 @@ and filters out raw structure details.
 			\centering
 			\includegraphics[width=0.92\linewidth]{photos/training_curves.png}
 		\end{figure}
-		\vspace{-0.3cm}
-		\begin{block}{}
 			\small $M^2$-CL converges faster and plateaus \textbf{higher} than all baselines. The contrastive regularizer suppresses loss spikes caused by domain-conflicting gradients.
-		\end{block}
 	\end{frame}
 
 	\begin{frame}{Results: PACS and VLCS (ResNet-18)}
 \begin{table}[htbp]
 \centering
+\caption{Top-1 accuracy on PACS, VLCS (ResNet-18)}
+
 \tiny
 \begin{adjustbox}{max width=\textwidth, max totalheight=0.75\textheight, keepaspectratio}
 \begin{tabular}{lrrrrrrrrrr}
@@ -522,6 +522,7 @@ SAGM & 55.79 & 46.51 & 71.16 & 73.15 & 61.65 \\
 	\begin{frame}{Ablation Study on PACS and VLCS}
 \begin{table}[htbp]
 \centering
+\caption{Ablation study on PACS and VLCS evaluating the effects of the projection type (pipe), compression ratio ($r$), dropout, and contrastive loss. The best and second-best results are highlighted in bold and underlined, respectively.}
 \tiny
 \begin{adjustbox}{max width=\textwidth,max totalheight=0.75\textheight,keepaspectratio}
 \begin{tabular}{llllrrrrrrrrrr}
@@ -833,7 +834,7 @@ $\alpha$ & PACS & VLCS \\
 \end{frame}
 
 \begin{frame}{Sensitivity Analysis: Loss Scaling ($\alpha$ \& $\tau$)}
-		\begin{block}{Tables 6--7 Insights: Hyperparameter Tuning}
+		\begin{block}{Hyperparameter Tuning}
 			\begin{itemize}
 				\item \textbf{Temperature optimum:} PACS peaks at \textbf{84.67} with $\tau=0.8$, while VLCS peaks at \textbf{77.27} with $\tau=0.1$.
 				\item \textbf{Default-scale behavior:} $\tau=1.0$ remains competitive with \textbf{80.07} PACS and \textbf{76.24} VLCS.
@@ -842,7 +843,7 @@ $\alpha$ & PACS & VLCS \\
 		\end{block}
 		\begin{alertblock}{Alpha Bounds Limits }
 			\[ \alpha = 10e^{-1} \implies \text{PACS } 64.04,\quad \text{VLCS } 55.96 \]
-			A large contrastive weight dominates cross-entropy optimization and causes a sharp drop compared with the best scores in Table 7.
+			% A large contrastive weight dominates cross-entropy optimization and causes a sharp drop compared with the best scores in Table 7.
 		\end{alertblock}
 	\end{frame}
 
