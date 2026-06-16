@@ -19,7 +19,7 @@ _net = None
 def net():
     global _net
     if _net is None:
-        _net = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1).eval()
+        _net = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2).eval()
     return _net
 
 PREP = transforms.Compose([
