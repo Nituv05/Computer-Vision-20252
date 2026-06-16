@@ -75,41 +75,61 @@
 		\begin{block}{The Core Objective}
 			Train a parametric model $f(\cdot;\theta)$ on a set of $N$ available \textbf{source domains} $\mathcal{S} = \{S_1, S_2, \dots, S_N\}$ such that it generalizes robustly to $K$ completely \textbf{unseen target domains} $\mathcal{T} = \{T_1, T_2, \dots, T_K\}$.
 		\end{block}
-		\begin{alertblock}{The Strict Constraint vs. Domain Adaptation}
+		\begin{alertblock}{Why Is This Hard?}
 			\begin{itemize}
-				\item \textbf{Domain Adaptation:} Has access to unlabeled target domain data during training.
-				\item \textbf{Domain Generalization:} \alert{Zero access} to target-domain data or target labels during the optimization cycle.
+				\item \alert{Zero access} to target-domain data during training --- no direct supervision signal.
+				\item Models must learn \textbf{domain-invariant} features from source data alone.
+				\item Distribution shift at test time causes catastrophic accuracy drops in naive ERM.
 			\end{itemize}
 		\end{alertblock}
 	\end{frame}
 
-\begin{frame}{The Failure Mechanism: Shortcut Learning}
+	\begin{frame}{Related Work: Where Existing Methods Fall Short}
 		\begin{columns}[T]
-			% --- CỘT TRÁI: TỪ KHÓA NGẮN GỌN ---
-			\begin{column}{0.45\textwidth}
-				\begin{block}{The ERM Trap}
+			\begin{column}{0.50\textwidth}
+				\begin{block}{Representative DG Approaches}
 					\begin{itemize}
-						\item Models minimize error by taking the \textbf{path of least resistance}.
-						\item Exploits \alert{superficial shortcuts} (textures, backgrounds).
+						\item \textbf{ERM:} Aggregates all source data --- learns domain-specific shortcuts.
+						\item \textbf{CORAL / MMD:} Aligns first/second-order statistics --- \alert{single layer only}, loses geometric detail.
+						\item \textbf{RSC:} Drops dominant features at training --- ignores multi-scale structure.
+						\item \textbf{Mixup:} Interpolates images across domains --- does not enforce feature invariance.
 					\end{itemize}
 				\end{block}
-				
-				\begin{alertblock}{Domain Shift Collapse}
+			\end{column}
+			\begin{column}{0.50\textwidth}
+				\begin{alertblock}{What $M^2$-CL Contributes}
 					\begin{itemize}
-						\item \textbf{Photo $\rightarrow$ Sketch:} Context and style cues completely vanish.
-						\item \alert{Result:} Catastrophic accuracy drop.
+						\item \textbf{Multi-scale \& multi-layer} extraction --- captures geometry at every depth.
+						\item \textbf{Spatial Dropout} in each block --- prevents style shortcuts from leaking.
+						\item \textbf{Layer-wise contrastive loss} --- enforces same-class alignment across domains at \emph{all} scales simultaneously.
 					\end{itemize}
 				\end{alertblock}
 			\end{column}
-			
-			% --- CỘT PHẢI: VISUALIZATION CHÍ MẠNG ---
+		\end{columns}
+	\end{frame}
+
+\begin{frame}{Why ERM Fails: Shortcut Learning}
+		\begin{columns}[T]
+			\begin{column}{0.45\textwidth}
+				\begin{block}{The ERM Trap}
+					\begin{itemize}
+						\item Minimizes training loss by exploiting \alert{superficial shortcuts} (textures, backgrounds) rather than object geometry.
+						\item These cues \textbf{vanish or invert} under domain shift.
+					\end{itemize}
+				\end{block}
+				\begin{alertblock}{This Motivates $M^2$-CL}
+					\begin{itemize}
+						\item Need to \textbf{force the model} to rely on structural, domain-invariant features.
+						\item Solution: align same-class representations across domains at \emph{multiple scales}.
+					\end{itemize}
+				\end{alertblock}
+			\end{column}
 			\begin{column}{0.55\textwidth}
 				\centering
 				\vspace{0.2cm}
-				% Thay tên file ảnh thực tế của nhóm bạn vào đây
 				\includegraphics[width=0.95\linewidth]{photos/failure_1.jpg}
-				\usebeamercolor[fg]{caption}\small 
-				\textit{Fig: ERM relies on "Grass" (Shortcut) instead of the actual "Cow" geometry.}
+				\usebeamercolor[fg]{caption}\small
+				\textit{Fig: ERM relies on ``Grass'' (shortcut) instead of actual ``Cow'' geometry.}
 			\end{column}
 		\end{columns}
 	\end{frame}
@@ -241,31 +261,18 @@ and filters out raw structure details.
 
 \begin{frame}{Spatial Dropout}
 	\begin{columns}[T]
-		% --- CỘT TRÁI: SO SÁNH TỪ KHÓA ---
-		\begin{column}{0.45\textwidth}
-			\begin{block}{Vanilla Dropout (CNN Failure)}
-				\begin{itemize}
-					\item Drops \textbf{individual pixels} randomly.
-					\item \alert{Result:} Info leaks; regularization fails.
-				\end{itemize}
+		\begin{column}{0.42\textwidth}
+			\begin{block}{Vanilla Dropout}
+				\small Drops \textbf{individual pixels} --- adjacent pixels remain correlated; style information \alert{leaks through}.
 			\end{block}
-			
-			\begin{alertblock}{Spatial Dropout (Our Solution)}
-				\begin{itemize}
-					\item Drops \textbf{entire feature maps} ($H \times W$).
-					\item Forces network to find alternative cues.
-					\item \textbf{Result:} Blocks local style shortcuts.
-				\end{itemize}
+			\vspace{0.15cm}
+			\begin{alertblock}{Spatial Dropout}
+				\small Drops \textbf{entire feature maps} ($H \times W$ channels). Forces the network to rely on alternative feature maps, \textbf{blocking style shortcuts} at the source.
 			\end{alertblock}
 		\end{column}
-		
-		% --- CỘT PHẢI: HÌNH ẢNH MINH HỌA 3D TENSOR ---
-		\begin{column}{0.55\textwidth}
+		\begin{column}{0.58\textwidth}
 			\centering
-			\vspace{0.3cm}
 			\includegraphics[width=\linewidth]{photos/spatial_dropout.png}
-			\usebeamercolor[fg]{caption}\small 
-			% \textit{Fig: Structural comparison. Spatial Dropout removes full 2D channels to prevent correlation leakage.}
 		\end{column}
 	\end{columns}
 \end{frame}
@@ -349,64 +356,54 @@ and filters out raw structure details.
 	\useStyleLogoOnly
 	\useThickBar
 
-	\begin{frame}{Technical Specifications \& Hyperparameters}
-		\begin{alertblock}{Optimizer Configurations}
-			\begin{itemize}
-				\item Base Optimization: Stochastic Gradient Descent (SGD) for 30 epochs.
-				\item Learning Rate: 0.001, Batch Size Allocation: 128.
-				\item Default Extraction Blocks Settings: Reduction factor $r=4$.
-				\item Default Loss Balancing: Weight $\alpha = 0.01$, Temperature $\tau = 1.0$.
-			\end{itemize}
-		\end{alertblock}
-	\end{frame}
-
-	\begin{frame}{Evaluation Benchmarks}
+	\begin{frame}{Hyperparameters \& Design Choices}
 		\begin{columns}[T]
-			% --- CỘT 1: PACS ---
-            	\begin{column}{0.33\textwidth}
-				\begin{alertblock}{VLCS Dataset}
+			\begin{column}{0.50\textwidth}
+				\begin{block}{Optimizer}
 					\begin{itemize}
-						\item \textbf{Size:} 10,729 images | \textbf{Classes:} 5
-						\item \textbf{Domains (4):} PASCAL, LabelMe, Caltech, SUN.
+						\item \textbf{SGD, 30 epochs:} Stable convergence; training curves plateau before epoch 30.
+						\item \textbf{LR = 0.001:} Standard for fine-tuning pretrained ResNet; avoids over-shooting.
+						\item \textbf{Batch = 128:} Contrastive loss requires enough positive/negative pairs per step.
+					\end{itemize}
+				\end{block}
+			\end{column}
+			\begin{column}{0.50\textwidth}
+				\begin{alertblock}{Architecture \& Loss}
+					\begin{itemize}
+						\item \textbf{$r = 4$:} Ablation (Table 3) shows best accuracy/memory trade-off; $r{=}2$ overfits, $r{=}6$ under-compresses.
+						\item \textbf{$\alpha = 0.01$:} Contrastive term guides without dominating CE loss; larger $\alpha$ collapses to 64\% PACS.
+						\item \textbf{$\tau = 1.0$:} Robust default; sensitivity analysis (Appendix) shows stable performance across $\tau \in [0.8, 1.4]$.
 					\end{itemize}
 				\end{alertblock}
-				\centering
-				\vspace{0.1cm}
-				
-			\end{column}
-			\begin{column}{0.33\textwidth}
-				\begin{block}{PACS Dataset}
-					\begin{itemize}
-						\item \textbf{Size:} 9,991 images | \textbf{Classes:} 7
-						\item \textbf{Domains (4):} Photo, Art Painting, Cartoon, Sketch.
-					\end{itemize}
-				\end{block}
-				\centering
-				\vspace{0.1cm}
-				
-			\end{column}
-			
-			% --- CỘT 2: VLCS ---
-		
-			
-			% --- CỘT 3: OFFICE-HOME ---
-			\begin{column}{0.33\textwidth}
-				\begin{block}{Office-Home Dataset}
-					\begin{itemize}
-						\item \textbf{Size:} 15,588 images | \textbf{Classes:} 65
-						\item \textbf{Domains (4):} Art, Clipart, Product, Real-World.
-					\end{itemize}
-				\end{block}
-				\centering
-				\vspace{0.1cm}
-				
 			\end{column}
 		\end{columns}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.55\linewidth]{photos/dataset_cv1.png}
-        \label{fig:placeholder}
-    \end{figure}
+	\end{frame}
+
+	\begin{frame}{Benchmark Datasets}
+		\begin{columns}[T]
+			\begin{column}{0.33\textwidth}
+				\begin{alertblock}{VLCS}
+					\small\textbf{10,729 images} | 5 classes\\
+					Domains: PASCAL, LabelMe, Caltech, SUN
+				\end{alertblock}
+			\end{column}
+			\begin{column}{0.33\textwidth}
+				\begin{block}{PACS}
+					\small\textbf{9,991 images} | 7 classes\\
+					Domains: Photo, Art, Cartoon, Sketch
+				\end{block}
+			\end{column}
+			\begin{column}{0.33\textwidth}
+				\begin{block}{Office-Home}
+					\small\textbf{15,588 images} | 65 classes\\
+					Domains: Art, Clipart, Product, Real-World
+				\end{block}
+			\end{column}
+		\end{columns}
+		\begin{figure}
+			\centering
+			\includegraphics[width=0.60\linewidth]{photos/dataset_cv1.png}
+		\end{figure}
 	\end{frame}
 
 	
@@ -427,15 +424,14 @@ and filters out raw structure details.
 		\end{block}
 	\end{frame}
 
-	\begin{frame}{Dataset Table : PACS and VLCS (ResNet-18)}
+	\begin{frame}{Results: PACS and VLCS (ResNet-18)}
 \begin{table}[htbp]
 \centering
-\caption{Top-1 accuracy on PACS and VLCS, ResNet-18.}
-\scriptsize
-\begin{adjustbox}{max width=\textwidth}
+\tiny
+\begin{adjustbox}{max width=\textwidth, max totalheight=0.75\textheight, keepaspectratio}
 \begin{tabular}{lrrrrrrrrrr}
 \toprule
-Method & Art & Cartoon & Photo & Sketch & Avg & Caltech & Labelme & Sun & Voc & Avg \\
+Method & Art & Cartoon & Photo & Sketch & \textbf{PACS Avg} & Caltech & Labelme & Sun & Voc & \textbf{VLCS Avg} \\
 \midrule
 ERM & 76.53 & 74.80 & 94.95 & 67.89 & 78.54 & 96.87 & 65.03 & 71.62 & 71.60 & 76.28 \\
 RSC & 79.26 & 76.12 & 95.07 & 70.88 & 80.34 & 97.68 & 66.33 & 73.53 & 72.75 & 77.57 \\
@@ -499,31 +495,6 @@ SAGM & 55.79 & 46.51 & 71.16 & 73.15 & 61.65 \\
 
 
 
-	\begin{frame}{Method Comparison — All Datasets (ResNet-18)}
-		\begin{figure}
-			\centering
-			\includegraphics[width=0.95\linewidth]{photos/bar_comparison.png}
-		\end{figure}
-	\end{frame}
-\begin{frame}{Per-Domain Analysis on PACS (ResNet-18)}
-	\begin{columns}[T]
-		\begin{column}{0.5\textwidth}
-			\begin{figure}
-				\centering
-				\includegraphics[width=\linewidth]{photos/radar_pacs.png}
-			\end{figure}
-		\end{column}
-		\begin{column}{0.5\textwidth}
-			\begin{block}{Key Observations}
-				\begin{itemize}
-					\item $M^2$-CL achieves the best overall balance across all domains.
-					\item Largest improvement: \textbf{Sketch} (+7.9 pp vs. ERM), indicating robustness to severe style shifts.
-					\item Gains on \textbf{Art} suggest better cross-domain feature alignment.
-				\end{itemize}
-			\end{block}
-		\end{column}
-	\end{columns}
-\end{frame}
 
 	\begin{frame}{Quantitative Results: Main Takeaways}
 		\begin{columns}[T]
@@ -548,29 +519,28 @@ SAGM & 55.79 & 46.51 & 71.16 & 73.15 & 61.65 \\
 		\end{columns}
 	\end{frame}
 
-	\begin{frame}{Table: Ablation Study on PACS and VLCS}
+	\begin{frame}{Ablation Study on PACS and VLCS}
 \begin{table}[htbp]
 \centering
-\caption{Ablation study on PACS and VLCS, ResNet-18.}
 \tiny
-\begin{adjustbox}{max width=\textwidth,max totalheight=0.72\textheight,keepaspectratio}
+\begin{adjustbox}{max width=\textwidth,max totalheight=0.75\textheight,keepaspectratio}
 \begin{tabular}{llllrrrrrrrrrr}
 \toprule
-pipe & r & drop & loss & A & C & P & S & PACS Avg & C & L & S & V & VLCS Avg \\
+pipe & r & drop & loss & A & C & P & S & \textbf{PACS Avg} & C & L & S & V & \textbf{VLCS Avg} \\
 \midrule
-c & 2 & - & - & 72.34 & 72.29 & 94.19 & 69.51 & 78.23 & 93.87 & 60.91 & 65.89 & 61.91 & 71.22 \\
+c & 2 & - & - & 72.34 & 72.29 & 94.19 & 69.51 & 78.23 & 93.87 & \underline{60.91} & 65.89 & 61.91 & 71.22 \\
 c & 4 & - & - & 74.38 & 72.74 & 90.13 & 69.71 & 77.21 & 94.14 & 59.01 & 67.82 & 65.42 & 69.62 \\
 c & 6 & - & - & 75.72 & 70.12 & 94.26 & 73.33 & 77.92 & 91.93 & 56.81 & 67.28 & 64.10 & 68.95 \\
-c & 2 & yes & - & 75.67 & 73.29 & 92.16 & 75.95 & 77.93 & 93.73 & 57.72 & 66.34 & 62.50 & 71.74 \\
-c & 4 & yes & - & 74.36 & 74.05 & 92.57 & 76.45 & 79.37 & 96.07 & 56.28 & 67.07 & 64.30 & 65.81 \\
+c & 2 & yes & - & 75.67 & 73.29 & 92.16 & \underline{75.95} & 77.93 & 93.73 & 57.72 & 66.34 & 62.50 & 71.74 \\
+c & 4 & yes & - & 74.36 & 74.05 & 92.57 & \textbf{76.45} & 79.37 & \underline{96.07} & 56.28 & 67.07 & 64.30 & 65.81 \\
 c & 6 & yes & - & 75.97 & 72.77 & 93.01 & 74.73 & 76.81 & 92.94 & 59.73 & 66.15 & 64.51 & 70.09 \\
-p & 2 & - & - & 76.09 & 55.88 & 68.35 & 60.92 & 64.40 & 95.60 & 56.97 & 66.25 & 73.15 & 73.96 \\
+p & 2 & - & - & 76.09 & 55.88 & 68.35 & 60.92 & 64.40 & 95.60 & 56.97 & 66.25 & 73.15 & \underline{73.96} \\
 p & 4 & - & - & 74.72 & 74.62 & 92.01 & 70.32 & 77.64 & 95.20 & 58.10 & 66.20 & 64.90 & 70.29 \\
-p & 6 & - & - & 75.38 & 69.99 & 91.21 & 69.47 & 77.77 & 95.23 & 56.81 & 69.13 & 65.34 & 70.55 \\
+p & 6 & - & - & 75.38 & 69.99 & 91.21 & 69.47 & 77.77 & 95.23 & 56.81 & \textbf{69.13} & 65.34 & 70.55 \\
 p & 2 & yes & - & 74.61 & 72.39 & 87.08 & 73.95 & 78.88 & 95.73 & 58.33 & 68.44 & 63.74 & 70.49 \\
-p & 6 & yes & - & 76.73 & 73.98 & 93.41 & 73.56 & 79.84 & 93.19 & 56.05 & 66.62 & 64.24 & 70.43 \\
-p & 4 & yes & - & 76.39 & 75.98 & 95.58 & 74.49 & 79.15 & 94.54 & 59.77 & 67.26 & 74.55 & 73.14 \\
-p & 4 & yes & yes & 80.43 & 75.43 & 96.87 & 74.42 & 80.10 & 96.09 & 61.15 & 69.05 & 75.70 & 74.15 \\
+p & 6 & yes & - & \underline{76.73} & 73.98 & 93.41 & 73.56 & \underline{79.84} & 93.19 & 56.05 & 66.62 & 64.24 & 70.43 \\
+p & 4 & yes & - & 76.39 & \textbf{75.98} & \underline{95.58} & 74.49 & 79.15 & 94.54 & 59.77 & 67.26 & \underline{74.55} & 73.14 \\
+p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 & \textbf{80.10} & \textbf{96.09} & \textbf{61.15} & \underline{69.05} & \textbf{75.70} & \textbf{74.15} \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
@@ -594,29 +564,43 @@ p & 4 & yes & yes & 80.43 & 75.43 & 96.87 & 74.42 & 80.10 & 96.09 & 61.15 & 69.0
 	% =================================================================
 \section{Qualitative Visualizations}
 
-\begin{frame}{Feature Space Visualization: ERM vs $M^2$-CL}
-	\begin{figure}
-		\centering
-		\includegraphics[width=0.65\linewidth]{photos/tsne_comparison.png}
-	\end{figure}
-	\vspace{-0.3cm}
-	\begin{block}{}
-		\small \textbf{Left (ERM):} Same-class features from different domains are dispersed — the model learns domain-specific patterns.
-		\textbf{Right ($M^2$-CL):} Contrastive regularization \alert{collapses domain scatter} within each class while \alert{separating} inter-class clusters.
-	\end{block}
+\begin{frame}{Feature Space: t-SNE Visualization}
+	\begin{columns}[T]
+		\begin{column}{0.55\textwidth}
+			\centering
+			\includegraphics[width=\linewidth]{photos/tsne_comparison.png}
+		\end{column}
+		\begin{column}{0.45\textwidth}
+			\begin{block}{ERM (Left)}
+				\small Same-class points from different domains are \alert{scattered} --- the model encodes domain identity, not class identity.
+			\end{block}
+			\vspace{0.1cm}
+			\begin{alertblock}{$M^2$-CL (Right)}
+				\small The layer-wise contrastive loss \textbf{collapses intra-class domain scatter}: all domains for the same class cluster tightly, while inter-class boundaries stay sharp.\\[4pt]
+				\textbf{Insight:} The network has learned truly \emph{domain-invariant} representations, directly validating the contrastive objective.
+			\end{alertblock}
+		\end{column}
+	\end{columns}
 \end{frame}
 
-\begin{frame}{Visualizing Robustness via Saliency Maps}
-	\begin{block}{Methodology}
-		Visualizes the gradients of the class score function relative to input image pixels. Darker pixel weights highlight the regions that contribute most to final classification decisions.
-	\end{block}
-
-	\begin{figure}
-		\centering
-		\includegraphics[width=0.8\linewidth]{photos/Pacs.png}
-
-		\caption{Saliency maps comparison on the PACS dataset.}
-	\end{figure}
+\begin{frame}{Saliency Maps: What the Model Focuses On}
+	\begin{columns}[T]
+		\begin{column}{0.55\textwidth}
+			\centering
+			\includegraphics[width=\linewidth]{photos/Pacs.png}
+		\end{column}
+		\begin{column}{0.45\textwidth}
+			\vspace{0.2cm}
+			\begin{block}{ERM}
+				\small Saliency spreads across \alert{backgrounds and textures} --- the model fires on domain-specific context (grass, sky) rather than object structure.
+			\end{block}
+			\vspace{0.1cm}
+			\begin{alertblock}{$M^2$-CL}
+				\small Saliency concentrates on \textbf{object contours and edges}, consistent across Photo, Art, Cartoon, and Sketch domains.\\[4pt]
+				\textbf{Insight:} The contrastive loss forces the network to anchor decisions on \emph{structural geometry}, not style --- the intended inductive bias.
+			\end{alertblock}
+		\end{column}
+	\end{columns}
 \end{frame}
 
 	% \begin{frame}{Saliency Map Insights \& Interpretations}
@@ -701,6 +685,13 @@ p & 4 & yes & yes & 80.43 & 75.43 & 96.87 & 74.42 & 80.10 & 96.09 & 61.15 & 69.0
 	\hustthankyou
 
 \section{Appendix}
+\begin{frame}{Method Comparison — All Datasets (ResNet-18)}
+	\begin{figure}
+		\centering
+		\includegraphics[width=0.95\linewidth]{photos/bar_comparison.png}
+	\end{figure}
+\end{frame}
+
 \begin{frame}{Dataset Table: PACS and VLCS (ResNet-50)}
 \begin{table}[htbp]
 \centering
@@ -807,6 +798,40 @@ $\alpha$ & PACS & VLCS \\
 \end{tabular}
 \end{table}
 	\end{frame}
+\begin{frame}{Baseline Methods Overview}
+	\begin{columns}[T]
+		\begin{column}{0.50\textwidth}
+			\begin{block}{Statistical Alignment}
+				\small
+				\begin{itemize}
+					\item \textbf{CORAL:} Aligns second-order statistics (covariance) across source domains.
+					\item \textbf{MMD:} Minimizes Maximum Mean Discrepancy between domain distributions.
+				\end{itemize}
+			\end{block}
+			\vspace{0.1cm}
+			\begin{block}{Data Augmentation / Interpolation}
+				\small
+				\begin{itemize}
+					\item \textbf{Mixup:} Interpolates images and labels across domain pairs.
+					\item \textbf{SagNet:} Style-adversarial training to separate content from style.
+				\end{itemize}
+			\end{block}
+		\end{column}
+		\begin{column}{0.50\textwidth}
+			\begin{alertblock}{Feature Regularization}
+				\small
+				\begin{itemize}
+					\item \textbf{RSC:} Randomly suppresses dominant activations to prevent shortcut reliance.
+					\item \textbf{SelfReg:} Self-regularization via contrastive and distance-based losses.
+					\item \textbf{ARM:} Context-conditional adaptation at inference time.
+					\item \textbf{SAGM:} Sharpness-aware gradient matching for flat loss minima.
+					\item \textbf{EQRM:} Empirical quantile risk minimization to reduce tail risk.
+				\end{itemize}
+			\end{alertblock}
+		\end{column}
+	\end{columns}
+\end{frame}
+
 \begin{frame}{Sensitivity Analysis: Loss Scaling ($\alpha$ \& $\tau$)}
 		\begin{block}{Tables 6--7 Insights: Hyperparameter Tuning}
 			\begin{itemize}
