@@ -56,7 +56,7 @@
 
 	% Pre-pages defined by HUST theme
 	\hustintropage{}
-	\hustsectionpage{}
+	% \hustsectionpage{}
 	\husttitlepage
 
 	% =================================================================
@@ -182,27 +182,27 @@ and filters out raw structure details.
 			\end{column}
 		\end{columns}
 	\end{frame}
-\begin{frame}{Mathematical Formalization \& Multi-Layer Hypothesis}
-		\begin{columns}[T]
-			% --- CỘT TRÁI: ĐỊNH NGHĨA TOÁN HỌC ---
-			\begin{column}{0.5\textwidth}
-				\begin{block}{Disentangled Group Actions}
-					Let group $G = G_1 \times \dots \times G_n$ act on world space $X = X_1 \times \dots \times X_n$:
-					$$ (g_1, \dots, g_n) \cdot (x_1, \dots, x_n) = (g_1 \cdot_1 x_1, \dots, g_n \cdot_n x_n) $$
-					\small $\implies$ Each sub-space $X_i$ is strictly invariant to all subgroup actions $G_j$ ($j \neq i$).
-				\end{block}
-			\end{column}
+% \begin{frame}{Mathematical Formalization \& Multi-Layer Hypothesis}
+% 		\begin{columns}[T]
+% 			% --- CỘT TRÁI: ĐỊNH NGHĨA TOÁN HỌC ---
+% 			\begin{column}{0.5\textwidth}
+% 				\begin{block}{Disentangled Group Actions}
+% 					Let group $G = G_1 \times \dots \times G_n$ act on world space $X = X_1 \times \dots \times X_n$:
+% 					$$ (g_1, \dots, g_n) \cdot (x_1, \dots, x_n) = (g_1 \cdot_1 x_1, \dots, g_n \cdot_n x_n) $$
+% 					\small $\implies$ Each sub-space $X_i$ is strictly invariant to all subgroup actions $G_j$ ($j \neq i$).
+% 				\end{block}
+% 			\end{column}
 			
-			% --- CỘT PHẢI: GIẢ THUYẾT ĐA TẦNG ---
-			\begin{column}{0.5\textwidth}
-				\begin{alertblock}{The $M^2$ Latent Hypothesis}
-					Instead of a single entangled final layer, we decompose intermediate hidden layers:
-					$$ Z = Z_1 \times Z_2 \times \dots \times Z_{L-1} $$
-					\small $\implies$ Extraction modules handle high-dimensionality and filter out redundant info.
-				\end{alertblock}
-			\end{column}
-		\end{columns}
-	\end{frame}
+% 			% --- CỘT PHẢI: GIẢ THUYẾT ĐA TẦNG ---
+% 			\begin{column}{0.5\textwidth}
+% 				\begin{alertblock}{The $M^2$ Latent Hypothesis}
+% 					Instead of a single entangled final layer, we decompose intermediate hidden layers:
+% 					$$ Z = Z_1 \times Z_2 \times \dots \times Z_{L-1} $$
+% 					\small $\implies$ Extraction modules handle high-dimensionality and filter out redundant info.
+% 				\end{alertblock}
+% 			\end{column}
+% 		\end{columns}
+% 	\end{frame}
 
 	% =================================================================
 	% SECTION 3: M2 ARCHITECTURE DETAILS
@@ -309,55 +309,42 @@ and filters out raw structure details.
 	% =================================================================
 	
 
-	\begin{frame}{Supervised Contrastive Regularization Strategy}
-		\begin{block}{The Necessity of Geometric Constraints}
-			Simply extracting intermediate representations does not ensure that hidden filters actively discard domain-specific style noise. 
-		\end{block}
-		\begin{alertblock}{Target Geometric Alignment}
-			\begin{itemize}
-				\item \textbf{Pull Same-Class Closely:} Force representations of identical semantic labels (e.g., a Dog in Photo and a Dog in Sketch) to align tightly in the latent space across domains.
-				\item \textbf{Push Different-Classes Apart:} Move different semantic labels far apart, even if they share an identical background style.
-			\end{itemize}
-		\end{alertblock}
-	\end{frame}
+	\begin{frame}{The M2-CL Loss Framework}
+    \begin{columns}[t]
+        % COLUMN 1: STRATEGY & EFFICIENCY
+        \begin{column}{0.44\textwidth}
+            \begin{block}{Geometric Constraints}
+                \begin{itemize}
+                    \item \textbf{Pull:} Same class, cross domains.
+                    \item \textbf{Push:} Different classes, same style.
+                \end{itemize}
+            \end{block}
+            
+            \begin{exampleblock}{Matrix Parallelization}
+                \begin{itemize}
+                    \item Prevents memory bottlenecks.
+                    \item Stacks batch: $U^{(l)T}U^{(l)}$.
+                    \item Denominator computed \textbf{once}.
+                \end{itemize}
+            \end{exampleblock}
+        \end{column}
 
-	\begin{frame}{Mathematical Formulation of Layer-Wise Loss}
-		\begin{block}{Probability Alignment Measure}
-			Let $u_i^{(l)}$ be the L2-normalized extraction vector ($||u_i^{(l)}||=1$) of sample $x_i$ at hidden layer $l$. The probability alignment measure of class $c$ within a batch is defined as:
-			$$ p^{(l)}(c) = \frac{\sum_{i=1}^{N_c}\sum_{j=i+1}^{N_c} \exp(u_i^{(l)T}u_j^{(l)} / \tau)}{\sum_{i=1}^{N_b}\sum_{a \neq i}^{N_b}\exp(u_i^{(l)T}u_a^{(l)} / \tau)} $$
-		\end{block}
-		\begin{alertblock}{Parameters Key}
-			\begin{itemize}
-				\item $N_c$: Total count of elements belonging strictly to class $c$ inside the batch.
-				\item $N_b$: Complete batch sample size count.
-				\item $\tau$: Temperature parameter regulating distribution density mass.
-			\end{itemize}
-		\end{alertblock}
-	\end{frame}
+        % COLUMN 2: MATHEMATICS
+        \begin{column}{0.53\textwidth}
+            \begin{alertblock}{Alignment Measure ($\|u\|=1$)}
+                \small
+                \[ p^{(l)}(c) = \frac{\sum_{i, j \in N_c} \exp(u_i^{T}u_j / \tau)}{\sum_{i, a \in N_b} \exp(u_i^{T}u_a / \tau)} \]
+            \end{alertblock}
 
-	\begin{frame}{The Total Optimization Objective}
-		\begin{block}{Joint Structural Loss}
-			Considering all $C$ distinct classes, the total log-likelihood regularizer loss over $M$ selected hidden layers is formulated as:
-			$$ \mathcal{L}^{(l)} = -\sum_{c=1}^{C}\log p^{(l)}(c) \implies \mathcal{L} = \mathcal{L}_{CE} + \alpha \sum_{l=1}^{M}\mathcal{L}^{(l)} $$
-		\end{block}
-		\begin{alertblock}{Hyperparameter Definition}
-			\begin{itemize}
-				\item $\mathcal{L}_{CE}$: Classical cross-entropy loss driving target category discrimination.
-				\item $\alpha$: Scaling weight setting the optimization magnitude of the contrastive regularization branch.
-			\end{itemize}
-		\end{alertblock}
-	\end{frame}
-
-\begin{frame}{Computational Efficiency Principles}
-	\begin{block}{The Bottleneck}
-		Pairwise vector products across multiple hidden layers $\implies$ \alert{Severe memory bottlenecks}.
-	\end{block}
-	\begin{alertblock}{The Matrix Parallelization Solution}
-		\begin{itemize}
-			\item \textbf{Instant Computation:} Stack batch vectors into matrix $U^{(l)} \rightarrow U^{(l)T}U^{(l)}$.
-			\item \textbf{Minimal Overhead:} Denominator computed \textbf{once per batch} (identical for all classes).
-		\end{itemize}
-	\end{alertblock}
+            \begin{block}{Total Objective}
+                \small
+                \[ \mathcal{L} = \mathcal{L}_{CE} + \alpha \sum_{l=1}^{M} \mathcal{L}^{(l)} \]
+                \[ \mathcal{L}^{(l)} = -\sum_{c=1}^{C}\log p^{(l)}(c) \]
+                \scriptsize
+                % \textbf{Keys:} $\mathcal{L}_{CE}$ (CE Loss) $\cdot$ $\alpha$ (Weight) $\cdot$ $\tau$ (Temp)
+            \end{block}
+        \end{column}
+    \end{columns}
 \end{frame}
 
 	% =================================================================
@@ -445,7 +432,7 @@ and filters out raw structure details.
 		\end{block}
 	\end{frame}
 
-	\begin{frame}{Dataset Table 1: PACS and VLCS (ResNet-18)}
+	\begin{frame}{Dataset Table : PACS and VLCS (ResNet-18)}
 \begin{table}[htbp]
 \centering
 \caption{Top-1 accuracy on PACS and VLCS, ResNet-18.}
@@ -474,46 +461,19 @@ SAGM & 78.22 & 75.14 & 94.79 & 70.46 & 79.65 & 96.37 & 66.22 & 71.14 & 71.35 & 7
 \end{table}
 	\end{frame}
 
-	\begin{frame}{Dataset Table 2: PACS and VLCS (ResNet-50)}
-\begin{table}[htbp]
-\centering
-\caption{Top-1 accuracy on PACS and VLCS, ResNet-50.}
-\scriptsize
-\begin{adjustbox}{max width=\textwidth}
-\begin{tabular}{lrrrrrrrrrr}
-\toprule
-Method & Art & Cartoon & Photo & Sketch & Avg & Caltech & Labelme & Sun & Voc & Avg \\
-\midrule
-ERM & 83.54 & 78.47 & 96.51 & 73.64 & 83.04 & 97.01 & 62.22 & 71.79 & 76.09 & 76.78 \\
-RSC & 82.08 & \textbf{80.26} & 96.51 & 75.45 & 83.57 & \textbf{97.81} & 64.44 & 74.60 & 75.53 & 78.10 \\
-CORAL & 83.94 & 79.27 & 94.37 & \textbf{81.98} & 84.89 & 97.01 & 61.34 & 75.26 & 71.74 & 76.34 \\
-MIXUP & 85.16 & 77.40 & 96.23 & 78.26 & 84.26 & 96.94 & 62.33 & 73.40 & 72.32 & 76.25 \\
-MMD & 82.21 & 74.70 & 92.89 & 69.00 & 79.70 & 97.48 & 63.85 & 75.49 & 71.65 & 77.12 \\
-SagNet & 85.23 & 78.47 & 93.20 & 77.71 & 83.65 & 94.14 & 60.43 & 70.49 & 69.96 & 73.75 \\
-SelfReg & 83.33 & 79.06 & 93.16 & 77.24 & 83.20 & 92.49 & 60.73 & 66.80 & 73.58 & 73.40 \\
-ARM & 82.14 & 79.10 & 92.97 & 73.02 & 81.81 & 96.01 & 63.98 & 66.26 & 71.79 & 74.51 \\
-EQRM & 84.98 & 77.74 & 91.26 & 74.88 & 82.21 & 94.35 & 60.80 & 66.35 & 72.94 & 73.61 \\
-SAGM & 81.35 & 78.99 & 93.24 & 79.39 & 83.24 & 97.39 & 64.23 & 69.30 & 76.17 & 76.77 \\
-\midrule
-\textbf{M2} & \underline{86.02} & 79.90 & \underline{97.03} & 81.50 & \underline{86.11} & 97.52 & \underline{64.77} & \underline{76.02} & \underline{76.72} & \underline{78.76} \\
-\textbf{M2-CL} & \textbf{86.48} & \underline{80.05} & \textbf{97.99} & \underline{81.70} & \textbf{86.56} & \underline{97.60} & \textbf{64.86} & \textbf{76.65} & \textbf{77.26} & \textbf{79.09} \\
-\bottomrule
-\end{tabular}
-\end{adjustbox}
-\end{table}
-	\end{frame}
 
-	\begin{frame}{Performance Metrics on PACS and VLCS}
-		% \begin{alertblock}{Key Analysis Takeaways}
-			\begin{itemize}
-				\item \textbf{State-of-the-Art:} $M^2$-CL sets a new state-of-the-art benchmark average across both backbones.
-				\item \textbf{The Contrastive Loss Boost:} $M^2$-CL consistently outperforms the plain $M^2$ architecture, confirming that its explicit geometric alignment helps.
-				\item \textbf{The Sketch Challenge Exception:} Performance drops slightly in the Sketch target domain[cite: 362]. This is likely because the dominant white backgrounds make it difficult for the network to separate structural objects from the domain style[cite: 363].
-			\end{itemize}
-		% \end{alertblock}
-	\end{frame}
 
-	\begin{frame}{Dataset Table 3: Office-Home (ResNet-18)}
+	% \begin{frame}{Performance Metrics on PACS and VLCS}
+	% 	% \begin{alertblock}{Key Analysis Takeaways}
+	% 		\begin{itemize}
+	% 			\item \textbf{State-of-the-Art:} $M^2$-CL sets a new state-of-the-art benchmark average across both backbones.
+	% 			\item \textbf{The Contrastive Loss Boost:} $M^2$-CL consistently outperforms the plain $M^2$ architecture, confirming that its explicit geometric alignment helps.
+	% 			\item \textbf{The Sketch Challenge Exception:} Performance drops slightly in the Sketch target domain. This is likely because the dominant white backgrounds make it difficult for the network to separate structural objects from the domain style.
+	% 		\end{itemize}
+	% 	% \end{alertblock}
+	% \end{frame}
+
+\begin{frame}{Dataset Table : Office-Home (ResNet-18)}
 \begin{table}[htbp]
 \centering
 \caption{Top-1 accuracy on Office-Home, ResNet-18.}
@@ -542,34 +502,7 @@ SAGM & 55.79 & 46.51 & 71.16 & 73.15 & 61.65 \\
 \end{table}
 	\end{frame}
 
-	\begin{frame}{Dataset Table 4: Office-Home (ResNet-50)}
-\begin{table}[htbp]
-\centering
-\caption{Top-1 accuracy on Office-Home, ResNet-50.}
-\scriptsize
-\begin{adjustbox}{max width=\textwidth}
-\begin{tabular}{lrrrrr}
-\toprule
-Method & Art & Clipart & Product & Real-World & Avg \\
-\midrule
-ERM & 63.43 & 51.32 & 76.45 & \underline{78.13} & 67.33 \\
-RSC & 62.64 & 51.55 & 75.11 & 77.34 & 66.66 \\
-CORAL & 61.27 & \underline{54.34} & 73.35 & 77.83 & 66.70 \\
-MIXUP & 63.23 & 51.91 & \underline{77.10} & 76.39 & 67.16 \\
-MMD & 59.63 & 49.37 & 75.28 & 74.71 & 64.75 \\
-SagNet & 61.41 & 51.85 & 72.85 & 73.79 & 64.97 \\
-SelfReg & 59.95 & 51.22 & 71.28 & 74.52 & 64.24 \\
-ARM & 54.23 & 52.14 & 71.73 & 71.26 & 62.34 \\
-EQRM & 63.52 & 52.32 & 73.28 & 76.45 & 66.39 \\
-SAGM & 61.01 & 53.27 & 74.81 & 77.00 & 66.52 \\
-\midrule
-\textbf{M2} & \underline{65.35} & 53.90 & 76.80 & \textbf{78.74} & \underline{68.70} \\
-\textbf{M2-CL} & \textbf{66.46} & \textbf{54.82} & \textbf{78.24} & 77.85 & \textbf{69.34} \\
-\bottomrule
-\end{tabular}
-\end{adjustbox}
-\end{table}
-	\end{frame}
+
 
 	\begin{frame}{Method Comparison — All Datasets (ResNet-18)}
 		\begin{figure}
@@ -577,29 +510,25 @@ SAGM & 61.01 & 53.27 & 74.81 & 77.00 & 66.52 \\
 			\includegraphics[width=0.95\linewidth]{photos/bar_comparison.png}
 		\end{figure}
 	\end{frame}
-
-	\begin{frame}{Per-Domain Analysis on PACS (ResNet-18)}
-		\begin{columns}[T]
-			\begin{column}{0.5\textwidth}
-				\begin{figure}
-					\centering
-					\includegraphics[width=\linewidth]{photos/radar_pacs.png}
-				\end{figure}
-			\end{column}
-			\begin{column}{0.5\textwidth}
-				\begin{block}{Key Observations}
-					\begin{itemize}
-						\item $M^2$-CL dominates \textbf{all four} domains simultaneously.
-						\item Largest gain: \textbf{Sketch} (+7.9 pp over ERM), the hardest domain due to extreme style shift.
-						\item \textbf{Art Painting} gap confirms that contrastive regularization helps most when style variance is high.
-					\end{itemize}
-				\end{block}
-				\begin{alertblock}{Why ARM fails on Photo}
-					ARM's meta-learning relies on test-time adaptation signals; \textbf{Photo} (near-real domain) provides weak adaptation gradient, reducing its advantage.
-				\end{alertblock}
-			\end{column}
-		\end{columns}
-	\end{frame}
+\begin{frame}{Per-Domain Analysis on PACS (ResNet-18)}
+	\begin{columns}[T]
+		\begin{column}{0.5\textwidth}
+			\begin{figure}
+				\centering
+				\includegraphics[width=\linewidth]{photos/radar_pacs.png}
+			\end{figure}
+		\end{column}
+		\begin{column}{0.5\textwidth}
+			\begin{block}{Key Observations}
+				\begin{itemize}
+					\item $M^2$-CL achieves the best overall balance across all domains.
+					\item Largest improvement: \textbf{Sketch} (+7.9 pp vs. ERM), indicating robustness to severe style shifts.
+					\item Gains on \textbf{Art} suggest better cross-domain feature alignment.
+				\end{itemize}
+			\end{block}
+		\end{column}
+	\end{columns}
+\end{frame}
 
 	\begin{frame}{Quantitative Results: Main Takeaways}
 		\begin{columns}[T]
@@ -607,24 +536,24 @@ SAGM & 61.01 & 53.27 & 74.81 & 77.00 & 66.52 \\
 				\begin{block}{Average Accuracy}
 					\begin{itemize}
 						\item \textbf{ResNet-18:} $M^2$-CL reaches \textbf{82.51} on PACS, \textbf{78.50} on VLCS, and \textbf{64.18} on Office-Home.
-						\item \textbf{ResNet-50:} $M^2$-CL reaches \textbf{86.56} on PACS, \textbf{79.09} on VLCS, and \textbf{69.34} on Office-Home.
+						% \item \textbf{ResNet-50:} $M^2$-CL reaches \textbf{86.56} on PACS, \textbf{79.09} on VLCS, and \textbf{69.34} on Office-Home.
 						\item The average score improves over the strongest baseline in each benchmark summary.
 					\end{itemize}
 				\end{block}
 			\end{column}
 			\begin{column}{0.48\textwidth}
 				\begin{alertblock}{Interpretation}
-					\begin{itemize}
-						\item $M^2$ improves representation quality by reusing intermediate multi-scale features.
-						\item $M^2$-CL adds class-level alignment, making same-class features closer across source domains.
-						\item Per-domain scores are not uniformly best, so the ablation section checks which design choices drive the average gains.
-					\end{itemize}
-				\end{alertblock}
+	\begin{itemize}
+		\item $M^2$ improves feature representations through multi-scale reuse.
+		\item $M^2$-CL aligns same-class features across domains.
+		\item Ablation studies identify the sources of these gains.
+	\end{itemize}
+\end{alertblock}
 			\end{column}
 		\end{columns}
 	\end{frame}
 
-	\begin{frame}{Table 5: Ablation Study on PACS and VLCS}
+	\begin{frame}{Table: Ablation Study on PACS and VLCS}
 \begin{table}[htbp]
 \centering
 \caption{Ablation study on PACS and VLCS, ResNet-18.}
@@ -653,56 +582,8 @@ p & 4 & yes & yes & 80.43 & 75.43 & 96.87 & 74.42 & 80.10 & 96.09 & 61.15 & 69.0
 \end{table}
 	\end{frame}
 
-	\begin{frame}{Table 6: Sensitivity to Temperature $\tau$}
-\begin{table}[htbp]
-\centering
-\caption{Sensitivity analysis for $\tau$ in M2-CL, ResNet-18.}
-\scriptsize
-\begin{tabular}{lrr}
-\toprule
-$\tau$ & PACS & VLCS \\
-\midrule
-0.01 & 78.10 & 76.15 \\
-0.1 & 80.03 & 77.27 \\
-0.2 & 81.37 & 74.71 \\
-0.4 & 82.07 & 72.03 \\
-0.6 & 83.70 & 74.15 \\
-0.8 & 84.67 & 75.21 \\
-1.0 & 80.07 & 76.24 \\
-1.2 & 81.34 & 75.11 \\
-1.4 & 83.14 & 75.69 \\
-1.6 & 82.17 & 76.84 \\
-1.8 & 80.51 & 74.66 \\
-2.0 & 78.72 & 74.99 \\
-10.0 & 79.92 & 74.04 \\
-100.0 & 81.84 & 73.74 \\
-\bottomrule
-\end{tabular}
-\end{table}
-	\end{frame}
-
-	\begin{frame}{Table 7: Sensitivity to Loss Weight $\alpha$}
-\begin{table}[htbp]
-\centering
-\caption{Sensitivity analysis for $\alpha$ in M2-CL, ResNet-18.}
-\scriptsize
-\begin{tabular}{lrr}
-\toprule
-$\alpha$ & PACS & VLCS \\
-\midrule
-0.00 & 82.76 & 72.36 \\
-10e-5 & 80.41 & 73.56 \\
-10e-4 & 81.17 & 73.71 \\
-10e-3 & 82.29 & 74.38 \\
-10e-2 & 79.70 & 73.39 \\
-10e-1 & 64.04 & 55.96 \\
-\bottomrule
-\end{tabular}
-\end{table}
-	\end{frame}
-
 	\begin{frame}{Core Ablation Analysis}
-		\begin{block}{Table 5 Reference Insights (PACS / VLCS, ResNet-18)}
+		\begin{block}{Table: Reference Insights (PACS / VLCS, ResNet-18)}
 			\begin{itemize}
 				\item \textbf{Best full configuration:} $p, r=4, drop=yes, loss=yes$ reaches \textbf{80.10} PACS Avg and \textbf{74.15} VLCS Avg.
 				\item \textbf{Contrastive loss contribution:} adding the loss to the same $p, r=4, drop=yes$ setting improves PACS from \textbf{79.15} to \textbf{80.10} and VLCS from \textbf{73.14} to \textbf{74.15}.
@@ -711,19 +592,7 @@ $\alpha$ & PACS & VLCS \\
 		\end{block}
 	\end{frame}
 
-	\begin{frame}{Sensitivity Analysis: Loss Scaling ($\alpha$ \& $\tau$)}
-		\begin{block}{Tables 6--7 Insights: Hyperparameter Tuning}
-			\begin{itemize}
-				\item \textbf{Temperature optimum:} PACS peaks at \textbf{84.67} with $\tau=0.8$, while VLCS peaks at \textbf{77.27} with $\tau=0.1$.
-				\item \textbf{Default-scale behavior:} $\tau=1.0$ remains competitive with \textbf{80.07} PACS and \textbf{76.24} VLCS.
-				\item \textbf{Loss-weight sensitivity:} $\alpha=10e^{-3}$ gives the best VLCS score, \textbf{74.38}, while $\alpha=0$ gives the highest PACS score, \textbf{82.76}.
-			\end{itemize}
-		\end{block}
-		\begin{alertblock}{Alpha Bounds Limits }
-			\[ \alpha = 10e^{-1} \implies \text{PACS } 64.04,\quad \text{VLCS } 55.96 \]
-			A large contrastive weight dominates cross-entropy optimization and causes a sharp drop compared with the best scores in Table 7.
-		\end{alertblock}
-	\end{frame}
+	
 
 	% =================================================================
 	% SECTION 7: QUALITATIVE VISUALIZATIONS
@@ -733,7 +602,7 @@ $\alpha$ & PACS & VLCS \\
 \begin{frame}{Feature Space Visualization: ERM vs $M^2$-CL}
 	\begin{figure}
 		\centering
-		\includegraphics[width=0.95\linewidth]{photos/tsne_comparison.png}
+		\includegraphics[width=0.65\linewidth]{photos/tsne_comparison.png}
 	\end{figure}
 	\vspace{-0.3cm}
 	\begin{block}{}
@@ -755,26 +624,26 @@ $\alpha$ & PACS & VLCS \\
 	\end{figure}
 \end{frame}
 
-	\begin{frame}{Saliency Map Insights \& Interpretations}
-		\begin{columns}[T]
-			\begin{column}{0.5\textwidth}
-				\begin{block}{Baseline ERM Traps}
-					\begin{itemize}
-						\item Strongly influenced by background noise and spurious environmental features (e.g., sky, roads, grass).
-						\item Often focuses on non-causal elements within the scene, such as a motorcycle rider.
-					\end{itemize}
-				\end{block}
-			\end{column}
-			\begin{column}{0.5\textwidth}
-				\begin{alertblock}{Proposed $M^2$-CL Solution}
-					\begin{itemize}
-						\item Successfully ignores irrelevant background styles and focus fields.
-						\item Accurately isolates the core structural contours of objects, even in highly stylized domains like Sketch and Cartoon.
-					\end{itemize}
-				\end{alertblock}
-			\end{column}
-		\end{columns}
-	\end{frame}
+	% \begin{frame}{Saliency Map Insights \& Interpretations}
+	% 	\begin{columns}[T]
+	% 		\begin{column}{0.5\textwidth}
+	% 			\begin{block}{Baseline ERM Traps}
+	% 				\begin{itemize}
+	% 					\item Strongly influenced by background noise and spurious environmental features (e.g., sky, roads, grass).
+	% 					\item Often focuses on non-causal elements within the scene, such as a motorcycle rider.
+	% 				\end{itemize}
+	% 			\end{block}
+	% 		\end{column}
+	% 		\begin{column}{0.5\textwidth}
+	% 			\begin{alertblock}{Proposed $M^2$-CL Solution}
+	% 				\begin{itemize}
+	% 					\item Successfully ignores irrelevant background styles and focus fields.
+	% 					\item Accurately isolates the core structural contours of objects, even in highly stylized domains like Sketch and Cartoon.
+	% 				\end{itemize}
+	% 			\end{alertblock}
+	% 		\end{column}
+	% 	\end{columns}
+	% \end{frame}
 
 	% =================================================================
 	% SECTION 8: CONCLUSION
@@ -835,5 +704,126 @@ $\alpha$ & PACS & VLCS \\
 
 	% Closing Page
 	\hustthankyou
+
+\section{Appendix}
+\begin{frame}{Dataset Table: PACS and VLCS (ResNet-50)}
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on PACS and VLCS, ResNet-50.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Method & Art & Cartoon & Photo & Sketch & Avg & Caltech & Labelme & Sun & Voc & Avg \\
+\midrule
+ERM & 83.54 & 78.47 & 96.51 & 73.64 & 83.04 & 97.01 & 62.22 & 71.79 & 76.09 & 76.78 \\
+RSC & 82.08 & \textbf{80.26} & 96.51 & 75.45 & 83.57 & \textbf{97.81} & 64.44 & 74.60 & 75.53 & 78.10 \\
+CORAL & 83.94 & 79.27 & 94.37 & \textbf{81.98} & 84.89 & 97.01 & 61.34 & 75.26 & 71.74 & 76.34 \\
+MIXUP & 85.16 & 77.40 & 96.23 & 78.26 & 84.26 & 96.94 & 62.33 & 73.40 & 72.32 & 76.25 \\
+MMD & 82.21 & 74.70 & 92.89 & 69.00 & 79.70 & 97.48 & 63.85 & 75.49 & 71.65 & 77.12 \\
+SagNet & 85.23 & 78.47 & 93.20 & 77.71 & 83.65 & 94.14 & 60.43 & 70.49 & 69.96 & 73.75 \\
+SelfReg & 83.33 & 79.06 & 93.16 & 77.24 & 83.20 & 92.49 & 60.73 & 66.80 & 73.58 & 73.40 \\
+ARM & 82.14 & 79.10 & 92.97 & 73.02 & 81.81 & 96.01 & 63.98 & 66.26 & 71.79 & 74.51 \\
+EQRM & 84.98 & 77.74 & 91.26 & 74.88 & 82.21 & 94.35 & 60.80 & 66.35 & 72.94 & 73.61 \\
+SAGM & 81.35 & 78.99 & 93.24 & 79.39 & 83.24 & 97.39 & 64.23 & 69.30 & 76.17 & 76.77 \\
+\midrule
+\textbf{M2} & \underline{86.02} & 79.90 & \underline{97.03} & 81.50 & \underline{86.11} & 97.52 & \underline{64.77} & \underline{76.02} & \underline{76.72} & \underline{78.76} \\
+\textbf{M2-CL} & \textbf{86.48} & \underline{80.05} & \textbf{97.99} & \underline{81.70} & \textbf{86.56} & \underline{97.60} & \textbf{64.86} & \textbf{76.65} & \textbf{77.26} & \textbf{79.09} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+	\end{frame}
+
+	\begin{frame}{Dataset Table: Office-Home (ResNet-50)}
+\begin{table}[htbp]
+\centering
+\caption{Top-1 accuracy on Office-Home, ResNet-50.}
+\scriptsize
+\begin{adjustbox}{max width=\textwidth}
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Art & Clipart & Product & Real-World & Avg \\
+\midrule
+ERM & 63.43 & 51.32 & 76.45 & \underline{78.13} & 67.33 \\
+RSC & 62.64 & 51.55 & 75.11 & 77.34 & 66.66 \\
+CORAL & 61.27 & \underline{54.34} & 73.35 & 77.83 & 66.70 \\
+MIXUP & 63.23 & 51.91 & \underline{77.10} & 76.39 & 67.16 \\
+MMD & 59.63 & 49.37 & 75.28 & 74.71 & 64.75 \\
+SagNet & 61.41 & 51.85 & 72.85 & 73.79 & 64.97 \\
+SelfReg & 59.95 & 51.22 & 71.28 & 74.52 & 64.24 \\
+ARM & 54.23 & 52.14 & 71.73 & 71.26 & 62.34 \\
+EQRM & 63.52 & 52.32 & 73.28 & 76.45 & 66.39 \\
+SAGM & 61.01 & 53.27 & 74.81 & 77.00 & 66.52 \\
+\midrule
+\textbf{M2} & \underline{65.35} & 53.90 & 76.80 & \textbf{78.74} & \underline{68.70} \\
+\textbf{M2-CL} & \textbf{66.46} & \textbf{54.82} & \textbf{78.24} & 77.85 & \textbf{69.34} \\
+\bottomrule
+\end{tabular}
+\end{adjustbox}
+\end{table}
+	\end{frame}
+
+
+	\begin{frame}{Table: Sensitivity to Temperature $\tau$}
+\begin{table}[htbp]
+\centering
+\caption{Sensitivity analysis for $\tau$ in M2-CL, ResNet-18.}
+\scriptsize
+\begin{tabular}{lrr}
+\toprule
+$\tau$ & PACS & VLCS \\
+\midrule
+0.01 & 78.10 & 76.15 \\
+0.1 & 80.03 & 77.27 \\
+0.2 & 81.37 & 74.71 \\
+0.4 & 82.07 & 72.03 \\
+0.6 & 83.70 & 74.15 \\
+0.8 & 84.67 & 75.21 \\
+1.0 & 80.07 & 76.24 \\
+1.2 & 81.34 & 75.11 \\
+1.4 & 83.14 & 75.69 \\
+1.6 & 82.17 & 76.84 \\
+1.8 & 80.51 & 74.66 \\
+2.0 & 78.72 & 74.99 \\
+10.0 & 79.92 & 74.04 \\
+100.0 & 81.84 & 73.74 \\
+\bottomrule
+\end{tabular}
+\end{table}
+	\end{frame}
+
+	\begin{frame}{Table: Sensitivity to Loss Weight $\alpha$}
+\begin{table}[htbp]
+\centering
+\caption{Sensitivity analysis for $\alpha$ in M2-CL, ResNet-18.}
+\scriptsize
+\begin{tabular}{lrr}
+\toprule
+$\alpha$ & PACS & VLCS \\
+\midrule
+0.00 & 82.76 & 72.36 \\
+10e-5 & 80.41 & 73.56 \\
+10e-4 & 81.17 & 73.71 \\
+10e-3 & 82.29 & 74.38 \\
+10e-2 & 79.70 & 73.39 \\
+10e-1 & 64.04 & 55.96 \\
+\bottomrule
+\end{tabular}
+\end{table}
+	\end{frame}
+\begin{frame}{Sensitivity Analysis: Loss Scaling ($\alpha$ \& $\tau$)}
+		\begin{block}{Tables 6--7 Insights: Hyperparameter Tuning}
+			\begin{itemize}
+				\item \textbf{Temperature optimum:} PACS peaks at \textbf{84.67} with $\tau=0.8$, while VLCS peaks at \textbf{77.27} with $\tau=0.1$.
+				\item \textbf{Default-scale behavior:} $\tau=1.0$ remains competitive with \textbf{80.07} PACS and \textbf{76.24} VLCS.
+				\item \textbf{Loss-weight sensitivity:} $\alpha=10e^{-3}$ gives the best VLCS score, \textbf{74.38}, while $\alpha=0$ gives the highest PACS score, \textbf{82.76}.
+			\end{itemize}
+		\end{block}
+		\begin{alertblock}{Alpha Bounds Limits }
+			\[ \alpha = 10e^{-1} \implies \text{PACS } 64.04,\quad \text{VLCS } 55.96 \]
+			A large contrastive weight dominates cross-entropy optimization and causes a sharp drop compared with the best scores in Table 7.
+		\end{alertblock}
+	\end{frame}
 
 \end{document}
