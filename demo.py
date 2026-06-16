@@ -95,105 +95,77 @@ def analyse(pil_img):
     m2_box  = _hot_bbox(m2_sal)
 
     # ── Layout ──────────────────────────────────────────────────────────
-    fig = plt.figure(figsize=(14, 6.2), facecolor="white")
+    # Figure has two rows:
+    #   Row A (top, 28%): prediction name + top-5 bars
+    #   Row B (bot, 72%): 3 image panels side by side
+    fig = plt.figure(figsize=(14, 8.5), facecolor="white")
 
-    # Top strip: prediction header
-    ax_pred = fig.add_axes([0.0, 0.82, 1.0, 0.18], facecolor="#f7f7f7")
-    ax_pred.axis("off")
+    # ── Row A: prediction ────────────────────────────────────────────────
+    # Left cell: big class name + confidence
+    ax_name = fig.add_axes([0.02, 0.74, 0.24, 0.22], facecolor="white")
+    ax_name.axis("off")
+    ax_name.text(0.0, 0.90, "P R E D I C T I O N", fontsize=9, color="#aaa",
+                 fontweight="700",
+                 transform=ax_name.transAxes, va="top")
+    ax_name.text(0.0, 0.62, pred_name,
+                 fontsize=24, fontweight="800", color="#111",
+                 transform=ax_name.transAxes, va="top")
+    ax_name.text(0.0, 0.18, f"Confidence  {conf_pct}%",
+                 fontsize=12, color="#666",
+                 transform=ax_name.transAxes, va="top")
 
-    # Predicted class (large, centered)
-    ax_pred.text(0.5, 0.72, pred_name,
-                 ha="center", va="center", fontsize=26, fontweight="bold",
-                 color="#111", transform=ax_pred.transAxes)
-    ax_pred.text(0.5, 0.28,
-                 f"ResNet-18  ·  confidence {conf_pct}%  ·  ImageNet class {cls}",
-                 ha="center", va="center", fontsize=11, color="#777",
-                 transform=ax_pred.transAxes)
+    # Right cell: top-5 horizontal bars
+    ax_bars = fig.add_axes([0.30, 0.72, 0.68, 0.26], facecolor="white")
+    ax_bars.axis("off")
+    row_h   = 0.16          # height of each bar row (in axes fraction)
+    bar_max = 0.72          # max bar width (fraction of axes width)
 
-    # Top-5 bar (mini horizontal bars)
-    bar_w = 0.22
-    bar_left = 0.5 - bar_w / 2
     for rank, (lbl, p) in enumerate(top5):
-        bar_y = 0.72 - rank * 0.14
-        # background track
-        ax_pred.add_patch(patches.FancyBboxPatch(
-            (bar_left, bar_y - 0.05), bar_w, 0.07,
-            transform=ax_pred.transAxes, clip_on=False,
-            facecolor="#e0e0e0", linewidth=0, boxstyle="round,pad=0"))
-        # filled bar
-        ax_pred.add_patch(patches.FancyBboxPatch(
-            (bar_left, bar_y - 0.05), bar_w * p, 0.07,
-            transform=ax_pred.transAxes, clip_on=False,
-            facecolor="#B71C1C" if rank == 0 else "#BDBDBD",
-            linewidth=0, boxstyle="round,pad=0"))
-        ax_pred.text(bar_left - 0.01, bar_y - 0.005,
-                     lbl.title()[:20], ha="right", va="center",
-                     fontsize=8.5, color="#333",
-                     transform=ax_pred.transAxes)
-        ax_pred.text(bar_left + bar_w + 0.01, bar_y - 0.005,
-                     f"{p*100:.1f}%", ha="left", va="center",
-                     fontsize=8.5, color="#555",
-                     transform=ax_pred.transAxes)
-
-    # Adjust bar block to right side
-    # (redo with correct positions)
-    ax_pred.clear(); ax_pred.axis("off")
-
-    # Prediction text left
-    ax_pred.text(0.03, 0.60, "Prediction", fontsize=10, color="#888",
-                 fontweight="600", transform=ax_pred.transAxes,
-                 va="center", ha="left")
-    ax_pred.text(0.03, 0.28, pred_name,
-                 fontsize=22, fontweight="800", color="#111",
-                 transform=ax_pred.transAxes, va="center", ha="left")
-    ax_pred.text(0.03, 0.05, f"confidence  {conf_pct}%",
-                 fontsize=11, color="#777",
-                 transform=ax_pred.transAxes, va="center", ha="left")
-
-    # Top-5 bars right side
-    bx, by0 = 0.34, 0.82
-    bw_total = 0.62
-    for rank, (lbl, p) in enumerate(top5):
-        row_y = by0 - rank * 0.165
+        y = 1.0 - (rank + 0.5) * row_h
         # track
-        ax_pred.add_patch(patches.Rectangle(
-            (bx, row_y - 0.06), bw_total, 0.12,
-            transform=ax_pred.transAxes, clip_on=False,
-            facecolor="#eeeeee", linewidth=0))
+        ax_bars.add_patch(patches.Rectangle(
+            (0.22, y - 0.055), bar_max, 0.10,
+            transform=ax_bars.transAxes, clip_on=False,
+            facecolor="#f0f0f0", linewidth=0))
         # fill
-        ax_pred.add_patch(patches.Rectangle(
-            (bx, row_y - 0.06), bw_total * p, 0.12,
-            transform=ax_pred.transAxes, clip_on=False,
-            facecolor="#B71C1C" if rank == 0 else "#90A4AE",
+        ax_bars.add_patch(patches.Rectangle(
+            (0.22, y - 0.055), bar_max * p, 0.10,
+            transform=ax_bars.transAxes, clip_on=False,
+            facecolor="#B71C1C" if rank == 0 else "#B0BEC5",
             linewidth=0))
-        ax_pred.text(bx - 0.005, row_y,
-                     lbl.title()[:22], ha="right", va="center",
-                     fontsize=9, color="#333",
-                     transform=ax_pred.transAxes)
-        ax_pred.text(bx + bw_total + 0.005, row_y,
-                     f"{p*100:.1f}%", ha="left", va="center",
-                     fontsize=9, color="#555",
-                     transform=ax_pred.transAxes)
+        # label left
+        ax_bars.text(0.21, y, lbl.title()[:24],
+                     ha="right", va="center", fontsize=10, color="#333",
+                     transform=ax_bars.transAxes)
+        # pct right
+        ax_bars.text(0.22 + bar_max + 0.012, y, f"{p*100:.1f}%",
+                     ha="left", va="center", fontsize=10, color="#555",
+                     transform=ax_bars.transAxes)
 
-    # ── 3 image panels ──────────────────────────────────────────────────
-    panel_top, panel_h = 0.82, 0.82
-    pad = 0.01
-    w3  = (1.0 - 4*pad) / 3
+    # Divider line between rows
+    fig.add_artist(plt.Line2D([0.02, 0.98], [0.71, 0.71],
+                               transform=fig.transFigure,
+                               color="#e8e8e8", linewidth=1.2))
+
+    # ── Row B: 3 image panels ────────────────────────────────────────────
+    pad = 0.025
+    w3  = (1.0 - 4 * pad) / 3
 
     panel_cfg = [
-        (img224,  "Input Image",   None,    "#333333", None),
-        (erm_ov,  "ERM",           erm_box, "#1565C0", erm_hot),
-        (m2_ov,   "M²-CL  (Ours)", m2_box, "#B71C1C", m2_hot),
+        (img224,  "Input Image",    None,    "#333333", None),
+        (erm_ov,  "ERM",            erm_box, "#1565C0", erm_hot),
+        (m2_ov,   "M²-CL  (Ours)", m2_box,  "#B71C1C", m2_hot),
     ]
 
     for i, (data, title, bbox, color, hot) in enumerate(panel_cfg):
-        ax = fig.add_axes([pad + i*(w3+pad), 0.10, w3, panel_h - 0.10],
-                          facecolor="white")
+        ax = fig.add_axes([pad + i*(w3+pad), 0.11, w3, 0.56])
         ax.imshow(data)
         ax.axis("off")
         for spine in ax.spines.values():
-            spine.set_edgecolor(color); spine.set_linewidth(2.5)
-        ax.set_title(title, fontsize=14, fontweight="bold", color=color, pad=7)
+            spine.set_edgecolor(color)
+            spine.set_linewidth(2.5)
+        ax.set_title(title, fontsize=14, fontweight="bold",
+                     color=color, pad=10)
 
         if bbox is not None:
             x0, y0, x1, y1 = bbox
@@ -205,16 +177,16 @@ def analyse(pil_img):
             ax.add_patch(rect)
 
         if hot is not None:
-            ax.text(0.5, -0.04, f"Active region: {hot}%",
+            ax.text(0.5, -0.06, f"Active region:  {hot}%",
                     transform=ax.transAxes, ha="center",
-                    fontsize=11, color=color, fontweight="600")
+                    fontsize=11.5, color=color, fontweight="600")
 
-    # Footer note
+    # Footer
     fig.text(0.5, 0.03,
              f"M²-CL is {ratio}× more focused than ERM  ·  "
              "Guided backprop suppresses spurious texture gradients, "
              "isolating class-invariant structural features.",
-             ha="center", fontsize=10, color="#666", style="italic")
+             ha="center", fontsize=10.5, color="#777", style="italic")
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=140, bbox_inches="tight", facecolor="white")
@@ -240,26 +212,14 @@ with gr.Blocks(title="M²-CL Demo") as demo:
     </div>
     """)
 
-    with gr.Row():
-        # Main upload (file + clipboard)
-        inp = gr.Image(
-            type="pil",
-            sources=["upload", "clipboard"],
-            label="Upload or paste an image  (Ctrl+V)",
-            height=260,
-        )
-        # Dedicated webcam panel
-        cam = gr.Image(
-            type="pil",
-            sources=["webcam"],
-            label="📷  Webcam",
-            height=260,
-        )
-
-    out = gr.Image(show_label=False, height=460)
-
+    inp = gr.Image(
+        type="pil",
+        sources=["upload", "webcam", "clipboard"],
+        label="Upload / Webcam / Paste (Ctrl+V)",
+        height=280,
+    )
+    out = gr.Image(show_label=False, height=500)
     inp.change(fn=analyse, inputs=inp, outputs=out)
-    cam.change(fn=analyse, inputs=cam, outputs=out)
 
 if __name__ == "__main__":
     demo.launch(server_port=7860, css=CSS)
