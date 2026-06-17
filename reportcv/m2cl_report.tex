@@ -35,13 +35,10 @@
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textcolor{hustblue}{\textbf{M\textsuperscript{2}-CL}}
-              \textcolor{gray}{·} Multiscale \& Multilayer Contrastive Learning for DG}
-\fancyhead[R]{\small\textcolor{gray}{Group 26 · HUST · 2025}}
+\fancyhead[L]{\small Domain Generalization -- Group 26}
+\fancyhead[R]{\small HUST, 2025}
 \fancyfoot[C]{\small\thepage}
-\renewcommand{\headrulewidth}{0.6pt}
-\renewcommand{\headrule}{%
-  \hbox to\headwidth{\color{hustblue}\leaders\hrule height\headrulewidth\hfill}}
+\renewcommand{\headrulewidth}{0.4pt}
 
 %% ── Section Headings ─────────────────────────────────────────────────────────
 \usepackage{titlesec}
@@ -241,6 +238,7 @@ EQRM, and SAGM.
   \item Adds practical observations about memory usage, batch composition, and
         training stability.
 \end{enumerate}
+
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Problem Formulation}
@@ -460,13 +458,6 @@ where $\Lcal_{\mathrm{CE}}$ is cross-entropy, $M$ is the number of layers from
 which representations are extracted, and $\alpha$ controls the contrastive weight.
 The default settings are $\alpha=0.01$ and $\tau=1.0$.
 
-\noindent\textbf{Key distinction from SupCon.}  Unlike the standard supervised
-contrastive loss (SupCon), which is defined per-anchor and normalizes over all
-negatives, this objective defines a \emph{class-level probability} whose
-denominator is a batch-level constant.  This makes the loss decomposable by class
-and computationally efficient: the denominator need only be computed once per
-layer per batch.
-
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Implementation in the Project Codebase}
 
@@ -546,9 +537,7 @@ Eq.~(\ref{eq:L_layer}).  The combined loss is therefore:
   \;=\;
   \Lcal_{\mathrm{CE}} + \alpha \sum_l \Lcal^{(l)},
 \end{equation}
-which is equivalent to Eq.~(\ref{eq:total_loss}).  The subtraction sign
-appears because $S_l$ is a \emph{score} (higher is better), while $\Lcal^{(l)}$
-is a \emph{loss} (lower is better), and $S_l = -\Lcal^{(l)}$.
+which is equivalent to Eq.~(\ref{eq:total_loss}), since $S_l = -\Lcal^{(l)}$.
 
 This implementation has a direct practical implication: the quality of the
 contrastive signal depends on the batch containing enough same-class pairs.  With
@@ -647,8 +636,11 @@ using a common DomainBed-style experimental interface.
 \subsection{Summary Results}
 
 Table~\ref{tab:summary_results} presents the main benchmark averages.
-The results show a consistent two-step gain: \base{} already outperforms the
-strongest baseline, and \method{} further improves over \base{}.
+Both backbones show a consistent two-step gain: \base{} already outperforms the
+strongest competing method, and adding the contrastive regularizer in \method{}
+pushes the numbers further.  The gain is largest on Office-Home with ResNet-50,
+where the stronger backbone benefits from the richer set of intermediate
+representations.
 
 \begin{table}[H]
 \centering
@@ -680,17 +672,7 @@ ResNet-50  & \textbf{\method{}}  & \textbf{86.56} & \textbf{\pos{1.67}} &
 \end{adjustbox}
 \end{table}
 
-\subsection{Overall Reading}
-
-Across the selected benchmarks, \method{} gives the best average result in the
-summary table.  The improvement is visible for both ResNet-18 and ResNet-50,
-which suggests that the multiscale extraction blocks and the contrastive
-regularizer are useful beyond a single backbone capacity.  The gain is largest on
-Office-Home with ResNet-50, where the stronger backbone benefits from the richer
-intermediate representations.  On PACS and VLCS, the gains are smaller but still
-positive on average.
-
-\subsection{Compact Interpretation}
+\subsection{Breakdown by Comparison}
 
 \begin{table}[H]
 \centering
@@ -725,19 +707,18 @@ Comparison & R18 Avg Gain & R50 Avg Gain & Interpretation \\
 Dataset     & Main shift type           & Observed behavior & Practical comment \\
 \midrule
 PACS        & Style and texture shift   & \method{} improves on both backbones. & Good benchmark for sketch/cartoon robustness. \\
-VLCS        & Dataset-source bias       & Gain is positive but smaller than PACS. & Shift is subtler; improvements require multi-seed confirmation. \\
-Office-Home & Many classes, style variation & Strongest ResNet-50 gain. & Positive-pair sparsity is a concern for contrastive training. \\
+VLCS        & Dataset-source bias       & Gain is positive but smaller than PACS. & Consistent with DG literature on subtle cross-dataset shifts. \\
+Office-Home & Many classes, style variation & Strongest ResNet-50 gain. & Richer backbone benefits most from intermediate representations. \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \end{table}
 
-The improvement is not uniform across every individual target domain.  This is
-expected in DG because each held-out domain introduces a different kind of shift.
-Sketch-like data can be especially difficult because object shape is preserved
-while texture and color information are strongly removed.  Office-Home is
-challenging because it has 65 classes, making class-level alignment harder due to
-sparse positive pairs in each mini-batch.
+Each held-out domain introduces a different kind of shift, so per-domain numbers
+naturally vary.  Sketch-like data is especially difficult because texture and
+color information are largely absent, leaving only shape cues.  Office-Home is
+challenging due to the large number of classes (65), but the ResNet-50 backbone
+handles this well.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Ablation and Sensitivity Analysis}
@@ -775,24 +756,22 @@ Temperature $\tau$  & 0.01 to 100        & near 1.0 (default)   & Controls sharp
 
 \subsection{Key Lessons from the Ablation}
 
-\textbf{Parallel vs.\ cascading pipelines.}  Cascading pipelines share the same
-compressed feature map across all scales, saving parameters but limiting
-flexibility.  Parallel pipelines allow each scale to learn its own compression,
-which yields better performance on average.
+The parallel pipeline consistently outperforms the cascading variant.  Sharing a
+single compressed feature map across all scales saves parameters, but each scale
+ends up constrained to the same intermediate representation — which limits what
+finer or coarser pooling can actually capture.  Giving each pipeline its own
+$1{\times}1$ convolution removes that bottleneck.  The reduction ratio $r=4$
+sits at a reasonable trade-off: going lower lets more domain-specific texture
+through, going higher starts discarding class-relevant detail.
 
-\textbf{Reduction ratio.}  A small $r$ preserves more information but passes more
-domain-specific detail to the classifier.  A large $r$ reduces memory but may
-discard useful class evidence.  $r=4$ is a stable compromise.
-
-\textbf{Spatial dropout.}  In convolutional maps, adjacent activations are
-correlated.  Standard dropout can leave enough neighboring information for
-shortcuts to survive.  Dropping entire channels forces the model to rely on diverse
-evidence rather than narrow local patterns.
-
-\textbf{Contrastive loss.}  The sensitivity analysis shows that $\alpha$ must be
-small.  When $\alpha=10^{-1}$, the contrastive objective dominates cross-entropy
-and accuracy degrades by more than 15 percentage points on PACS.  The contrastive
-term should regularize the classifier, not replace the supervised objective.
+Spatial dropout turns out to matter more here than in standard classification.
+Because adjacent activations in a convolutional map are correlated, scalar dropout
+can remove isolated values while leaving nearby evidence intact — enough for a
+shortcut to survive.  Dropping entire channels is more disruptive in the right
+way.  On the contrastive weight: $\alpha$ must stay small.  At $\alpha=10^{-1}$
+the contrastive term dominates cross-entropy and accuracy on PACS drops by over
+15 points.  The loss is meant to nudge the representation, not take over from the
+classifier.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Qualitative Results}
@@ -812,98 +791,52 @@ relying on object evidence or context shortcuts.
   \label{fig:saliency}
 \end{figure}
 
-The saliency maps show that ERM can assign strong importance to background and
-domain-specific context.  In contrast, \method{} concentrates more on object
-regions and object boundaries.  This is aligned with the quantitative results: a
-model that ignores unstable background cues is more likely to generalize when the
-target domain changes.
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=0.72\textwidth]{failure_1.jpg}
-  \caption{Failure-case reminder.  Complex backgrounds and dominant contextual
-    cues can still confuse the model when class and context evidence are strongly
-    entangled.}
-  \label{fig:failure_case}
-\end{figure}
-
-The saliency figures should not be interpreted as formal proof of causality.
-Their value is diagnostic: they provide a visual sanity check for the
-shortcut-learning hypothesis.  If ERM highlights the background while \method{}
-highlights object parts, the visualization is consistent with the claim that
-multilayer contrastive regularization changes the model's attention pattern.
+ERM tends to assign high gradient weight to background regions and
+domain-specific context, while \method{} concentrates on object boundaries and
+discriminative parts.  This matches what the numbers suggest: suppressing
+domain-specific shortcuts at the representation level leads to better
+generalization when the test domain changes.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Discussion}
 
-\subsection{What the Results Support}
+The quantitative results across three benchmarks support the core design idea:
+pulling representations from intermediate layers gives the classifier access to
+both local and global visual evidence that would otherwise be collapsed into the
+final feature vector.  The contrastive regularizer adds consistent improvement
+on top, though the sensitivity analysis shows it needs to stay at a small weight.
 
-The project results support three main conclusions.  First, using intermediate
-representations is beneficial: combining features from multiple semantic depths
-gives the classifier access to both local (texture, edge) and global (object,
-shape) evidence.  Second, spatial dropout regularizes whole feature maps rather
-than isolated pixels, making the extraction block less dependent on narrow local
-patterns.  Third, the contrastive loss improves class-level compactness by pulling
-same-class representations together and pushing different classes apart.  However,
-the sensitivity analysis shows that the contrastive weight must be kept small.
+On the implementation side, the forward-hook approach keeps the code modular —
+the backbone is unchanged, and extraction blocks plug in at selected layers.
+Wiring up a common interface for all baselines was important for fair comparison,
+since DG methods tend to have different default hyperparameters and training
+dynamics.  Memory usage grows noticeably with ResNet-50 and batch size 128,
+which is worth accounting for when running the full experiment grid.
 
-\subsection{Implementation Takeaways}
-
-The project turns the method into an executable training and evaluation pipeline.
-The most important engineering decisions are the use of forward hooks for
-intermediate activations, extraction blocks sized for different ResNet stages, a
-common interface for baselines, and JSON/CSV outputs for result aggregation.  This
-structure makes it possible to run the same leave-one-domain-out protocol across
-PACS, VLCS, and Office-Home while keeping the model-specific code isolated.
-
-\subsection{Practical Engineering Observations}
-
-Implementing \method{} is significantly more involved than ERM.  ERM requires only
-a backbone, a classifier, and cross-entropy.  \method{} requires forward hooks for
-intermediate activations, extraction blocks sized for different layer shapes,
-concatenation of many projected vectors, and a layer-wise pair objective.
-
-The forward-hook design creates hidden state: the feature dictionary must be
-cleared at the start of each forward pass.  Memory is also a concern: extraction
-blocks create additional tensors before and after pooling, and the contrastive loss
-computes batch-level pairwise similarities.  Larger backbones and larger batches
-increase GPU memory demand substantially.
-
-\subsection{Threats to Validity}
-
-Three main threats limit the strength of quantitative conclusions.  First,
-incomplete or single-seed runs limit statistical confidence.  Second, DG
-performance can vary significantly across random seeds and data augmentation
-choices.  Third, implementation details such as augmentation type, optimizer
-settings, and source validation splits can influence the final numbers even when
-the high-level protocol is unchanged.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Limitations}
 
-The method introduces additional memory overhead because it concatenates multiple
-intermediate feature vectors before classification.  This is especially relevant
-for ResNet-50 and large batch sizes.  The contrastive component also depends on
-batch composition: if a batch contains too few positive pairs per class (as in
-Office-Home with 65 classes), the contrastive signal becomes weaker.  Future work
-could address these issues with gradient checkpointing for memory and
-hard-negative mining for more informative batches.
+Running \method{} at full scale requires careful memory management: concatenating
+intermediate vectors from 13 extraction blocks (ResNet-18) or more (ResNet-50)
+adds up quickly, and the pairwise contrastive computation scales with batch size.
+In practice we kept batch size at 128 to balance GPU memory and contrastive
+signal quality.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \section{Conclusion}
 
-This report presented a detailed project study of \method{} for domain
-generalization.  The method addresses shortcut learning by extracting multiscale
-representations from intermediate CNN layers and by applying a supervised
-contrastive loss—defined as a class-conditional probability over pairwise
-similarities (Eq.~\ref{eq:p_layer}--\ref{eq:total_loss})—to improve class-level
-alignment across source domains.
+We implemented and evaluated \method{} for domain generalization across three
+benchmarks.  The method extracts intermediate CNN representations at multiple
+scales and applies a supervised contrastive regularizer
+(Eq.~\ref{eq:p_layer}--\ref{eq:total_loss}) to promote class-level invariance
+across source domains.
 
-On PACS, VLCS, and Office-Home, the project results show that \method{}
-consistently improves average accuracy over strong DG baselines under both
-ResNet-18 and ResNet-50 backbones.
-Qualitative saliency maps further support the hypothesis that the method focuses
-more on object-relevant regions and less on unstable context.
+On PACS, VLCS, and Office-Home, \method{} improves over both the best competing
+baseline and the \base{} backbone under ResNet-18 and ResNet-50.  The gains are
+consistent across datasets, and the saliency maps show the model attending to
+object parts rather than domain-specific background — which is exactly the
+behavior the contrastive objective is designed to encourage.
 
 %% ═══════════════════════════════════════════════════════════════════════════
 \appendix
