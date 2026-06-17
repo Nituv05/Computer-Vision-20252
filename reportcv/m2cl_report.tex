@@ -181,7 +181,7 @@ accuracy drops sharply when test images come from a visual context absent during
 training.  This is common in practice: a model trained on photographs may fail on
 sketches, artworks, cartoons, or images captured under different lighting or camera
 conditions.  The root cause is that empirical risk minimization (ERM) does not
-distinguish between \emph{class-causal evidence} and \emph{domain-specific
+distinguish between \emph{class-relevant evidence} and \emph{domain-specific
 shortcuts}.  If a training domain repeatedly associates a class with a background,
 texture, or color distribution, a high-capacity CNN can exploit that correlation
 while still achieving low source-domain error.
@@ -378,7 +378,7 @@ head.
 Spatial dropout is crucial here because neighboring pixels in convolutional feature
 maps are highly correlated: standard dropout can remove isolated activations while
 leaving nearby evidence intact, which is insufficient to regularize shortcut
-patterns that span a spatial region.  Dropping entire channels forces the model to
+patterns that span a spatial region.  Dropping entire channels encourages the model to
 learn predictions that do not rely on any single feature map.
 
 \begin{figure}[H]
@@ -787,7 +787,7 @@ relying on object evidence or context shortcuts.
   \caption{PACS saliency maps comparing a baseline (ERM ResNet-18) and
     \method{}.  Darker regions indicate pixels with stronger influence on
     the predicted class.  \method{} focuses more on object regions and
-    boundaries; ERM assigns significant weight to domain-specific background.}
+    boundaries; ERM can assign significant weight to domain-specific background.}
   \label{fig:saliency}
 \end{figure}
 
