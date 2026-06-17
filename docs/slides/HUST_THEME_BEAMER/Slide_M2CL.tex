@@ -264,7 +264,7 @@ and filters out raw structure details.
 	\begin{columns}[T]
 		\begin{column}{0.42\textwidth}
 			\begin{block}{Vanilla Dropout}
-				\small Drops \textbf{individual pixels} --- adjacent pixels remain correlated; style information \alert{leaks through}.
+				\small Drops \textbf{individual pixels} - adjacent pixels remain correlated; style information \alert{leaks through}.
 			\end{block}
 			\vspace{0.15cm}
 			\begin{alertblock}{Spatial Dropout}
@@ -354,8 +354,6 @@ and filters out raw structure details.
 	% SECTION 5: EXPERIMENTAL SETUP
 	% =================================================================
 	\section{Experimental}
-	\useStyleLogoOnly
-	\useThickBar
 
 	\begin{frame}{Hyperparameters \& Design Choices}
 		\begin{columns}[T]
@@ -573,7 +571,7 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 		\end{column}
 		\begin{column}{0.45\textwidth}
 			\begin{block}{ERM (Left)}
-				\small Same-class points from different domains are \alert{scattered} --- the model encodes domain identity, not class identity.
+				\small Same-class points from different domains are \alert{scattered} - the model encodes domain identity, not class identity.
 			\end{block}
 			\vspace{0.1cm}
 			\begin{alertblock}{$M^2$-CL (Right)}
@@ -593,7 +591,7 @@ p & 4 & yes & yes & \textbf{80.43} & \underline{75.43} & \textbf{96.87} & 74.42 
 		\begin{column}{0.45\textwidth}
 			\vspace{0.2cm}
 			\begin{block}{ERM}
-				\small Saliency spreads across \alert{backgrounds and textures} --- the model fires on domain-specific context (grass, sky) rather than object structure.
+				\small Saliency spreads across \alert{backgrounds and textures} - the model fires on domain-specific context (grass, sky) rather than object structure.
 			\end{block}
 			\vspace{0.1cm}
 			\begin{alertblock}{$M^2$-CL}
