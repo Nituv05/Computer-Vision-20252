@@ -277,34 +277,34 @@ and filters out raw structure details.
 		\end{column}
 	\end{columns}
 \end{frame}
-\begin{frame}{Multi-Scale Concentration \& Hypercolumn Construction}
-		\begin{columns}[T]
-			% --- CỘT TRÁI: TEXT TINH GỌN (45% Chiều rộng) ---
-			\begin{column}{0.45\textwidth}
-				\begin{block}{Spatial Scaling Allocations}
+% \begin{frame}{Multi-Scale Concentration \& Hypercolumn Construction}
+% 		\begin{columns}[T]
+% 			% --- CỘT TRÁI: TEXT TINH GỌN (45% Chiều rộng) ---
+% 			\begin{column}{0.45\textwidth}
+% 				\begin{block}{Spatial Scaling Allocations}
 					
-					\begin{itemize}
-						\item \textbf{Early Hooks:} Pooling sizes optimized for $8\times8$, $4\times4$, and $2\times2$.
-						\item \textbf{Late Hooks:} Deeper fields adapt to $7\times7$ and $3\times3$ dimensions.
-					\end{itemize}
-				\end{block}
+% 					\begin{itemize}
+% 						\item \textbf{Early Hooks:} Pooling sizes optimized for $8\times8$, $4\times4$, and $2\times2$.
+% 						\item \textbf{Late Hooks:} Deeper fields adapt to $7\times7$ and $3\times3$ dimensions.
+% 					\end{itemize}
+% 				\end{block}
 				
-				\begin{alertblock}{Concatenation Protocol}
-					Flattened multi-scale vectors are concatenated into a \textbf{hypercolumn vector} for final FC layer classification.
-				\end{alertblock}
-			\end{column}
+% 				\begin{alertblock}{Concatenation Protocol}
+% 					Flattened multi-scale vectors are concatenated into a \textbf{hypercolumn vector} for final FC layer classification.
+% 				\end{alertblock}
+% 			\end{column}
 			
-			% --- CỘT PHẢI: CHÈN ẢNH MINH HỌA (55% Chiều rộng) ---
-			\begin{column}{0.55\textwidth}
-				\centering
-				\vspace{0.2cm}
-				% Thay tên file ảnh sơ đồ kiến trúc của bạn vào đây
-				\includegraphics[width=\linewidth]{photos/multilscale.png}
-				\usebeamercolor[fg]{caption}\small 
-				\textit{Fig: Multi-scale pooling pipelines merging into a unified Hypercolumn vector.}
-			\end{column}
-		\end{columns}
-	\end{frame}
+% 			% --- CỘT PHẢI: CHÈN ẢNH MINH HỌA (55% Chiều rộng) ---
+% 			\begin{column}{0.55\textwidth}
+% 				\centering
+% 				\vspace{0.2cm}
+% 				% Thay tên file ảnh sơ đồ kiến trúc của bạn vào đây
+% 				\includegraphics[width=\linewidth]{photos/multilscale.png}
+% 				\usebeamercolor[fg]{caption}\small 
+% 				\textit{Fig: Multi-scale pooling pipelines merging into a unified Hypercolumn vector.}
+% 			\end{column}
+% 		\end{columns}
+% 	\end{frame}
 
 
 	% =================================================================
@@ -323,13 +323,7 @@ and filters out raw structure details.
                 \end{itemize}
             \end{block}
             
-            \begin{exampleblock}{Matrix Parallelization}
-                \begin{itemize}
-                    \item Reduces memory bottlenecks.
-                    \item Stacks batch: $U^{(l)T}U^{(l)}$.
-                    \item Denominator computed \textbf{once}.
-                \end{itemize}
-            \end{exampleblock}
+        
         \end{column}
 
         % COLUMN 2: MATHEMATICS
