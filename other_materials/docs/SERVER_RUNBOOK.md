@@ -53,18 +53,16 @@ data_root/
 
 If data is elsewhere, replace `data_root` in commands with that path.
 
-## 4. Check Server And Data
-
-Default:
+## 4. Check Data Layout
 
 ```bash
-bash scripts/check_server_ready.sh
+python tools/check_data.py --data_root data_root --dataset all
 ```
 
 Custom data path:
 
 ```bash
-DATA_ROOT=/path/to/data_root bash scripts/check_server_ready.sh
+python tools/check_data.py --data_root /path/to/data_root --dataset all
 ```
 
 ## 5. Smoke Test

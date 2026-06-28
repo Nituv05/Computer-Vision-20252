@@ -49,6 +49,10 @@ server-backup/
 *.rar
 *.7z
 
+# Office and export formats (not committed)
+*.pptx
+*.docx
+
 # Logs, notebooks, and generated build artifacts
 *.log
 *.ipynb
