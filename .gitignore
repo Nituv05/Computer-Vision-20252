@@ -17,11 +17,13 @@ ENV/
 .env
 .env.*
 
-# IDE and OS files
+# IDE, OS, and AI editor files
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
+.claude/
+.opencode/
 
 # Datasets and generated experiment outputs
 data_root/
