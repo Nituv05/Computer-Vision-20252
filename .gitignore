@@ -24,11 +24,12 @@ ENV/
 Thumbs.db
 .claude/
 .opencode/
+.gitattributes
 
 # Datasets and generated experiment outputs
 data_root/
 datasets/
-# outputs/
+outputs/
 runs/
 wandb/
 checkpoints/
@@ -48,11 +49,6 @@ server-backup/
 *.rar
 *.7z
 
-# Local papers, slides and report exports
-# *.pdf
-*.pptx
-*.docx
-
 # Logs, notebooks, and generated build artifacts
 *.log
 *.ipynb
@@ -66,3 +62,10 @@ notebooks/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Generated slide assets (re-run generate_demo_plots.py to rebuild)
+other_materials/docs/slides/HUST_THEME_BEAMER/photos/
+other_materials/docs/slides/HUST_THEME_BEAMER/images/
+
+# Generated demo assets (re-run prepare_demo_assets.py to rebuild)
+other_materials/demo/demo_assets/
