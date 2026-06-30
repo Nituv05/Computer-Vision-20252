@@ -3,7 +3,7 @@ set -euo pipefail
 
 DATA_ROOT="${DATA_ROOT:-data_root}"
 BACKBONE="${BACKBONE:-resnet18}"
-BATCH_SIZE="${BATCH_SIZE:-64}"
+BATCH_SIZE="${BATCH_SIZE:-16}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
 SAVE_DIR="${SAVE_DIR:-outputs/smoke}"
 
