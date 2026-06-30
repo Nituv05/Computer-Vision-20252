@@ -66,10 +66,3 @@ notebooks/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
-
-# Generated slide assets (re-run generate_demo_plots.py to rebuild)
-other_materials/docs/slides/HUST_THEME_BEAMER/photos/
-other_materials/docs/slides/HUST_THEME_BEAMER/images/
-
-# Generated demo assets (re-run prepare_demo_assets.py to rebuild)
-other_materials/demo/demo_assets/

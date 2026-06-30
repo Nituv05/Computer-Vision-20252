@@ -1,50 +1,72 @@
-# M²-CL: Multiscale and Multilayer Contrastive Learning for Domain Generalization
+# M2-CL: Multiscale and Multilayer Contrastive Learning for Domain Generalization
 
-Course-project implementation of **M²-CL** — a domain generalization method that attaches multi-scale, multi-layer feature extraction blocks to a ResNet backbone and regularizes them with a layer-wise supervised contrastive loss.
+Course-project implementation of M2-CL for visual domain generalization. The
+project trains image classifiers on source domains and evaluates them on one
+held-out target domain.
 
-Supported methods: `erm`, `rsc`, `mixup`, `coral`, `mmd`, `sagnet`, `selfreg`, `arm`, `eqrm`, `sagm`, `m2`, `m2cl`.
+Supported methods:
 
----
+```text
+erm, rsc, mixup, coral, mmd, sagnet, selfreg, arm, eqrm, sagm, m2, m2cl
+```
+
+Supported benchmarks:
+
+```text
+PACS, VLCS, Office-Home
+```
 
 ## Requirements
 
-- Python ≥ 3.10
-- CUDA-capable GPU recommended (CPU works but is slow)
-
----
+- Python 3.10 or newer
+- CUDA-capable GPU recommended for full experiments
+- CPU can run sanity checks, but full training will be slow
 
 ## 1. Environment Setup
 
-```bash
-# Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+Linux, macOS, WSL, or Git Bash:
 
-# Install dependencies
+```bash
+git clone <repo-url>
+cd Computer-Vision-20252
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
----
+Windows PowerShell:
 
-## 2. Download Datasets
+```powershell
+git clone <repo-url>
+cd Computer-Vision-20252
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install --upgrade pip
+pip install -r requirements.txt
+```
 
-Run the downloader script from the **project root**. It tries the official DomainBed mirrors first and falls back to HuggingFace/Mediafire automatically.
+## 2. Dataset Setup
+
+Run the downloader from the project root. The expected dataset root is
+`data_root/`. The downloader tries DomainBed links first and falls back to public
+mirrors where available.
 
 ```bash
 python tools/download_data.py --data_root data_root --datasets pacs vlcs office_home
 ```
 
-Expected time: ~5–15 min depending on connection speed.
+Expected download time is roughly 5-15 minutes depending on network speed.
 
-After downloading, verify the layout:
+Verify the downloaded layout before training:
 
 ```bash
 python tools/check_data.py --data_root data_root --dataset all
 ```
 
-The expected folder structure is:
+Expected layout:
 
-```
+```text
 data_root/
   pacs/
     art_painting/<class>/*.jpg
@@ -63,26 +85,43 @@ data_root/
     RealWorld/<class>/*.jpg
 ```
 
----
+`Office-Home` also accepts common aliases such as `Real_World`,
+`Real World`, and `Real-World`.
 
-## 3. Quick Sanity Check (Smoke Test)
+## 3. Quick Sanity Check
 
-Run 1 epoch each on ERM and M²-CL to confirm the environment works before starting a full run:
+After downloading PACS, run a small smoke test before starting a full run. This
+trains ERM and M2-CL for one epoch on the PACS photo held-out split.
 
 ```bash
 bash scripts/smoke_test.sh
 ```
 
 Expected output ends with:
-```
+
+```text
 Smoke test finished. Outputs: outputs/smoke
 ```
 
----
+If `bash` is not available, run the equivalent Python commands manually:
 
-## 4. Reproducing Paper Results
+```bash
+python tools/train.py --dataset pacs --test_domain photo --data_root data_root --method erm --backbone resnet18 --epochs 1 --batch_size 64 --save_dir outputs/smoke
+python tools/train.py --dataset pacs --test_domain photo --data_root data_root --method m2cl --backbone resnet18 --epochs 1 --batch_size 64 --save_dir outputs/smoke
+python tools/summarize_results.py --metrics_dir outputs/smoke --output_csv outputs/smoke/smoke_results.csv
+```
 
-### 4a. Single run (fastest way to check one number)
+Successful runs write:
+
+```text
+outputs/smoke/*.pth
+outputs/smoke/*.json
+outputs/smoke/smoke_results.csv
+```
+
+## 4. Single Training Run
+
+Example: train M2-CL on PACS with `photo` as the unseen target domain.
 
 ```bash
 python tools/train.py \
@@ -90,45 +129,110 @@ python tools/train.py \
   --test_domain photo \
   --data_root data_root \
   --method m2cl \
-  --backbone resnet18
+  --backbone resnet18 \
+  --epochs 30 \
+  --hparams_profile paper \
+  --save_dir outputs/checkpoints
 ```
 
-Checkpoint and per-run JSON metrics are saved to `outputs/checkpoints/`.
+Other examples:
 
-### 4b. Full reproduction — all methods, all leave-one-out splits, 3 seeds
+```bash
+python tools/train.py --dataset pacs --test_domain photo --data_root data_root --method erm --backbone resnet18
+python tools/train.py --dataset pacs --test_domain photo --data_root data_root --method m2 --backbone resnet18 --alpha 0
+python tools/train.py --dataset pacs --test_domain photo --data_root data_root --method m2cl --backbone resnet50
+```
+
+The training script saves the best checkpoint and metrics JSON under
+`outputs/checkpoints/` by default.
+
+## 5. Full Experiment Grid
+
+The experiment launcher runs all held-out domains for the chosen dataset.
+Use `--dry_run` first to inspect the generated commands without training:
+
+```bash
+python tools/run_experiments.py \
+  --dataset pacs \
+  --data_root data_root \
+  --methods all \
+  --backbones resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --holdout_fraction 0.2 \
+  --hparams_profile paper \
+  --skip_existing \
+  --dry_run
+```
+
+Run the actual PACS grid by removing `--dry_run`:
+
+```bash
+python tools/run_experiments.py \
+  --dataset pacs \
+  --data_root data_root \
+  --methods all \
+  --backbones resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --holdout_fraction 0.2 \
+  --hparams_profile paper \
+  --skip_existing
+```
+
+To run PACS, VLCS, and Office-Home sequentially:
 
 ```bash
 bash scripts/run_main.sh
 ```
 
-This runs PACS → VLCS → Office-Home sequentially with ResNet-18, seeds 0/1/2, and all methods, then writes a summary CSV to `outputs/main_resnet18_results.csv`.
+This runs PACS, VLCS, and Office-Home sequentially with ResNet-18, seeds 0/1/2,
+and all methods, then writes a summary CSV to `outputs/main_resnet18_results.csv`.
 
-For ResNet-50:
+Useful wrapper overrides:
 
 ```bash
 BACKBONE=resnet50 bash scripts/run_main.sh
+METHODS="erm m2 m2cl" bash scripts/run_main.sh
+SEEDS="0" EPOCHS=1 bash scripts/run_main.sh
 ```
 
-### 4c. Controlling the run via environment variables
+Supported environment variables:
 
 | Variable | Default | Effect |
 |---|---|---|
 | `DATA_ROOT` | `data_root` | Path to datasets |
 | `BACKBONE` | `resnet18` | `resnet18` or `resnet50` |
-| `SEEDS` | `0 1 2` | Space-separated list |
+| `SEEDS` | `0 1 2` | Space-separated seed list |
 | `METHODS` | `all` | Space-separated method names, or `all` |
-| `DATASETS` | `pacs vlcs office_home` | Which datasets to run |
+| `DATASETS` | `pacs vlcs office_home` | Datasets to run |
 | `EPOCHS` | config default | Override epoch count |
 | `NUM_WORKERS` | `4` | DataLoader workers |
 | `SAVE_DIR` | `outputs/checkpoints` | Output directory |
 
-Example — run only M²-CL on PACS with 2 seeds:
+Example: run only M2-CL on PACS with two seeds:
 
 ```bash
 METHODS="m2cl" DATASETS="pacs" SEEDS="0 1" bash scripts/run_main.sh
 ```
 
-### 4d. Summarize results to CSV
+On Windows without `bash`, run `tools/run_experiments.py` separately for each
+dataset with the same options.
+
+## 6. Evaluation and Result Summary
+
+Evaluate saved checkpoints:
+
+```bash
+python tools/evaluate.py \
+  --dataset pacs \
+  --data_root data_root \
+  --checkpoint_dir outputs/checkpoints \
+  --method m2cl \
+  --backbone resnet18
+```
+
+Aggregate metrics JSON files into CSV:
 
 ```bash
 python tools/summarize_results.py \
@@ -136,111 +240,118 @@ python tools/summarize_results.py \
   --output_csv outputs/results.csv
 ```
 
----
-
-## 5. Expected Results
-
-Numbers below are mean test accuracy (%) averaged over 4 leave-one-domain-out splits and 3 seeds.
-
-| Dataset | ResNet-18 | ResNet-50 |
-|---|---:|---:|
-| PACS | 83.54 | 85.97 |
-| VLCS | 77.78 | 78.36 |
-| Office-Home | 63.27 | 71.07 |
-
-Per-domain breakdown for PACS ResNet-18 (Table I in the report):
-
-| art\_painting | cartoon | photo | sketch | avg |
-|---:|---:|---:|---:|---:|
-| 81.66 | 78.42 | 97.00 | 77.07 | 83.54 |
-
----
-
-## 6. Evaluation Only (from saved checkpoint)
-
-```bash
-python tools/evaluate.py \
-  --dataset pacs \
-  --data_root data_root \
-  --method m2cl
-```
-
----
+The summary script prints per-split mean/std and dataset averages across held-out
+domains.
 
 ## 7. Ablation Studies
 
-Run all ablation tables (architecture variants, temperature τ, balance weight α):
+Run the ablation tables for PACS and VLCS:
+
+```bash
+python tools/run_ablations.py \
+  --tables all \
+  --datasets pacs vlcs \
+  --data_root data_root \
+  --backbone resnet18 \
+  --seeds 0 1 2 \
+  --epochs 30 \
+  --hparams_profile paper \
+  --save_dir outputs/ablation_tables \
+  --skip_existing
+```
+
+Individual table groups:
+
+```bash
+python tools/run_ablations.py --tables 5 --datasets pacs vlcs --data_root data_root
+python tools/run_ablations.py --tables 6 --datasets pacs vlcs --data_root data_root
+python tools/run_ablations.py --tables 7 --datasets pacs vlcs --data_root data_root
+```
+
+Wrapper script:
 
 ```bash
 bash scripts/run_ablations.sh
 ```
 
-Individual tables:
-
-```bash
-# Table 5 — architecture variants
-python tools/run_ablations.py --tables 5 --datasets pacs vlcs --data_root data_root
-
-# Table 6 — temperature τ sensitivity
-python tools/run_ablations.py --tables 6 --datasets pacs vlcs --data_root data_root
-
-# Table 7 — alpha α sensitivity
-python tools/run_ablations.py --tables 7 --datasets pacs vlcs --data_root data_root
-```
-
-Results are saved to `outputs/ablation_tables/results.csv`.
-
----
+Results are saved under `outputs/ablation_tables/`.
 
 ## 8. Saliency Maps
 
-Visualize which image regions the model attends to:
+Generate gradient saliency maps from a saved checkpoint:
 
 ```bash
 python tools/saliency.py \
   --dataset pacs \
   --test_domain photo \
   --data_root data_root \
-  --method m2cl
+  --checkpoint_dir outputs/checkpoints \
+  --method m2cl \
+  --backbone resnet18 \
+  --max_images 8
 ```
 
-Side-by-side original/saliency images are saved to `outputs/saliency/`.
+Outputs are saved to:
 
----
-
-## Project Structure
-
+```text
+outputs/saliency/
 ```
+
+## 9. Reference Numbers
+
+Reference averages from the M2-CL paper are included only as context. Local
+results may differ depending on hardware, seeds, dataset mirrors, and training
+settings.
+
+| Dataset     | ResNet-18 | ResNet-50 |
+|-------------|----------:|----------:|
+| PACS        |     83.54 |     85.97 |
+| VLCS        |     77.78 |     78.36 |
+| Office-Home |     63.27 |     71.07 |
+
+## 10. Project Structure
+
+```text
 algorithms/
-  baselines.py          # ERM, RSC, Mixup, CORAL, MMD, SagNet, SelfReg, ARM, EQRM, SAGM, M2, M2CL
+  baselines.py              ERM, DG baselines, M2, and M2-CL wrappers
 configs/
-  pacs.yaml             # default hyperparameters for each dataset
+  pacs.yaml
   vlcs.yaml
   office_home.yaml
 data/
-  pacs.py               # dataset loaders
+  pacs.py
   vlcs.py
   office_home.py
 losses/
-  contrastive.py        # layer-wise supervised contrastive loss
+  contrastive.py            layer-wise supervised contrastive loss
 models/
-  m2cl.py               # M2/M2-CL model with ResNet-18/50 backbone
-  extraction_block.py   # multi-scale concentration pipeline
-  architecture_baselines.py  # ablation model variants
-  architecture_specs.py      # ablation variant metadata
+  m2cl.py                   M2/M2-CL architecture with ResNet-18/50 backbones
+  extraction_block.py       multi-scale concentration pipeline
+  architecture_baselines.py ablation architecture variants
+  architecture_specs.py     ablation variant metadata
 utils/
-  transforms.py         # ImageNet normalisation, train/test augmentation
+  transforms.py             ImageNet normalization and augmentation
 tools/
-  train.py              # single-run training entry point
-  evaluate.py           # checkpoint evaluation
-  run_experiments.py    # full grid launcher
-  run_ablations.py      # ablation study launcher
-  summarize_results.py  # aggregate metrics to CSV
-  download_data.py      # dataset downloader
-  check_data.py         # dataset layout validator
-  saliency.py           # gradient saliency visualizer
+  train.py                  single-run training
+  evaluate.py               checkpoint evaluation
+  run_experiments.py        experiment grid launcher
+  run_ablations.py          ablation grid launcher
+  summarize_results.py      metrics aggregation
+  download_data.py          dataset downloader
+  check_data.py             dataset layout validator
+  saliency.py               gradient saliency visualization
 scripts/
-  run_main.sh           # wrapper: full experiment grid
-  run_ablations.sh      # wrapper: ablation grid
-  smoke_test.sh         # quick sanity check (1 epoch)
+  run_main.sh               full experiment wrapper
+  run_ablations.sh          ablation wrapper
+  smoke_test.sh             quick sanity check
+```
+
+Generated files are intentionally ignored by Git:
+
+```text
+data_root/
+outputs/
+wandb/
+*.pth
+*.pt
 ```
